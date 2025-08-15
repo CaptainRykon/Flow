@@ -1,18 +1,18 @@
 {
     "accountAssociation": {
         "header": "eyJmaWQiOjEwMjAyNTEsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg5ZDZBMzk3RjA0Yjk1NDk2QTIwNzVDRDBkMUUyYTIyMkZCZTA2ZGE0In0",
-        "payload": "eyJkb21haW4iOiJmYXJnby1zYWJsZS52ZXJjZWwuYXBwIn0",
-        "signature": "MHgyM2ZlNzE3NjhhMmE3OWNmMTI0ZjMzYWU5YTU5MzhhMTcwMDA1MzI0NDE0MmFiZTczNDA3MzZiYjUzNjViN2Q3NjgyZjQ2NTM0M2YxNjZhNWFkMTA2YzViYzM1YmI1NWIwY2NkY2RjN2Q1OWVlYjc0MGY2ODdkNmRlYTkwOGVhZjFi"
+        "payload": "eyJkb21haW4iOiJmbG93LnRyZW5jaHZlcnNlLmNvbSJ9",
+        "signature": "MHhjNjgzNTUxMmRmNWY4ZTFlZWVmM2MzMDdlZTdkODlkYjM4OTBkYTNhNzM4MjgxYWZiZjM2ZTRhZDMzMGM5Mzg1NDhiYjczODdlZGUzYTQwZGFiZGZiYzVmYTI2YTk2YTFhNDcwYTkxY2EyNDRjZDU3MTIxZDEyNjA4NTZkNGZmNDFj"
     },
     "frame": {
         "version": "1",
-        "name": "FarGo",
-        "iconUrl": "https://i.ibb.co/wrysPc1W/Screenshot-2025-07-30-185947.png",
+        "name": "Flow",
+        "iconUrl": "https://flow.trenchverse.com/icon.png",
         "homeUrl": "https://flow.trenchverse.com",
-        "imageUrl": "https://fargo-sable.vercel.app/image.png",
+        "imageUrl": "https://flow.trenchverse.com/image.png",
         "buttonTitle": "Play Now",
-        "splashImageUrl": "https://i.ibb.co/wrysPc1W/Screenshot-2025-07-30-185947.png",
-        "splashBackgroundColor": "#003c47",
+        "splashImageUrl": "https://flow.trenchverse.com/splash.png",
+        "splashBackgroundColor": "#eeccff",
         "webhookUrl": "https://api.neynar.com/f/app/f8a87605-c797-468e-b218-3e568a323f38/event"
     }
 }
