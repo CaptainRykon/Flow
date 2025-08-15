@@ -8,16 +8,35 @@
     <link rel="stylesheet" href="TemplateData/style.css">
     <link rel="manifest" href="manifest.webmanifest">
     <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #unity-canvas {
+            display: block;
+            background: #000;
+        }
+
         /* Overlay styling */
         .overlay {
             position: fixed;
-            top: 50%;
+            top: 55%; /* moved slightly lower */
             left: 50%;
             transform: translate(-50%, -50%);
             color: #fff;
             font-family: sans-serif;
             text-align: center;
             z-index: 10;
+        }
+
+        .game-logo {
+            width: 140px;
+            height: auto;
+            margin-bottom: 10px;
         }
 
         .game-title {
@@ -32,19 +51,44 @@
             font-family: Georgia, 'Times New Roman', Times, serif;
             opacity: 0.8;
         }
+
+        /* Loading bar styling - placed near bottom */
+        #unity-loading-bar {
+            position: fixed;
+            bottom: 40px; /* a little above bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            z-index: 11;
+        }
+
+        #unity-progress-bar-empty {
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        #unity-progress-bar-full {
+            background: #fff;
+            height: 8px;
+            width: 0%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
     <div id="unity-container">
-        <canvas id="unity-canvas" width=432 height=900 tabindex="-1"></canvas>
+        <canvas id="unity-canvas" width="432" height="900" tabindex="-1"></canvas>
 
-        <!-- Overlay from second HTML -->
+        <!-- Overlay -->
         <div class="overlay">
-            <div class="game-title">FarGo</div>
+            <img class="game-logo" src="https://i.ibb.co/1fWQ3GLn/160-icon.png" alt="Game Logo">
+            <div class="game-title">Block Puzzel</div>
             <div class="company-name">by TrenchVerse</div>
         </div>
 
-        <!-- Loading bar (unchanged from first HTML, Unity logo removed) -->
+        <!-- Loading bar -->
         <div id="unity-loading-bar">
             <div id="unity-progress-bar-empty">
                 <div id="unity-progress-bar-full"></div>
@@ -61,28 +105,13 @@
             }
         });
 
-        var container = document.querySelector("#unity-container");
         var canvas = document.querySelector("#unity-canvas");
         var loadingBar = document.querySelector("#unity-loading-bar");
         var progressBarFull = document.querySelector("#unity-progress-bar-full");
         var warningBanner = document.querySelector("#unity-warning");
 
         function unityShowBanner(msg, type) {
-            function updateBannerVisibility() {
-                warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-            }
-            var div = document.createElement('div');
-            div.innerHTML = msg;
-            warningBanner.appendChild(div);
-            if (type == 'error') div.style = 'background: red; padding: 10px;';
-            else {
-                if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-                setTimeout(function () {
-                    warningBanner.removeChild(div);
-                    updateBannerVisibility();
-                }, 5000);
-            }
-            updateBannerVisibility();
+            console.log("Unity Banner:", msg, type); // No visual warnings
         }
 
         var buildUrl = "Build";
@@ -97,6 +126,9 @@
             productName: "BlockBlast",
             productVersion: "2.1.2",
             showBanner: unityShowBanner,
+            // 🚀 Skip Unity splash screen instantly
+            splashScreenStyle: "Dark",
+            backgroundColor: "#000000"
         };
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
@@ -112,7 +144,7 @@
         script.src = loaderUrl;
         script.onload = () => {
             createUnityInstance(canvas, config, (progress) => {
-                progressBarFull.style.width = 100 * progress + "%";
+                progressBarFull.style.width = (100 * progress) + "%";
             }).then((unityInstance) => {
                 loadingBar.style.display = "none";
                 document.querySelector(".overlay").style.display = "none"; // Hide overlay when game starts
