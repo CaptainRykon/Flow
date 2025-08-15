@@ -1,4 +1,3 @@
-
 {
     "accountAssociation": {
         "header": "eyJmaWQiOjEwMjAyNTEsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg5ZDZBMzk3RjA0Yjk1NDk2QTIwNzVDRDBkMUUyYTIyMkZCZTA2ZGE0In0",
@@ -9,11 +8,11 @@
         "version": "1",
         "name": "FarGo",
         "iconUrl": "https://i.ibb.co/wrysPc1W/Screenshot-2025-07-30-185947.png",
-        "homeUrl": "https://fargo-sable.vercel.app",
+        "homeUrl": "https://flow.trenchverse.com",
         "imageUrl": "https://fargo-sable.vercel.app/image.png",
         "buttonTitle": "Play Now",
         "splashImageUrl": "https://i.ibb.co/wrysPc1W/Screenshot-2025-07-30-185947.png",
         "splashBackgroundColor": "#003c47",
-        "webhookUrl": "https://api.neynar.com/f/app/86290aac-606b-45af-bf5f-016eb3facbc0/event"
+        "webhookUrl": "https://api.neynar.com/f/app/f8a87605-c797-468e-b218-3e568a323f38/event"
     }
 }
