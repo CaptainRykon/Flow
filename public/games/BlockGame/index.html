@@ -24,7 +24,7 @@
         /* Overlay styling */
         .overlay {
             position: fixed;
-            top: 55%; /* moved slightly lower */
+            top: 55%;
             left: 50%;
             transform: translate(-50%, -50%);
             color: #fff;
@@ -52,10 +52,10 @@
             opacity: 0.8;
         }
 
-        /* Loading bar styling - placed near bottom */
+        /* Loading bar styling */
         #unity-loading-bar {
             position: fixed;
-            bottom: 40px; /* a little above bottom */
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
             width: 60%;
@@ -111,7 +111,7 @@
         var warningBanner = document.querySelector("#unity-warning");
 
         function unityShowBanner(msg, type) {
-            console.log("Unity Banner:", msg, type); // No visual warnings
+            console.log("Unity Banner:", msg, type);
         }
 
         var buildUrl = "Build";
@@ -126,7 +126,6 @@
             productName: "BlockBlast",
             productVersion: "2.1.2",
             showBanner: unityShowBanner,
-            // 🚀 Skip Unity splash screen instantly
             splashScreenStyle: "Dark",
             backgroundColor: "#000000"
         };
@@ -147,10 +146,53 @@
                 progressBarFull.style.width = (100 * progress) + "%";
             }).then((unityInstance) => {
                 loadingBar.style.display = "none";
-                document.querySelector(".overlay").style.display = "none"; // Hide overlay when game starts
-            }).catch((message) => {
-                alert(message);
-            });
+                document.querySelector(".overlay").style.display = "none";
+
+                // === Farcaster Bridge Integration ===
+                window.UnityShareGame = () =>
+                    window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
+
+                window.UnityShareScore = (s) =>
+                    window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
+
+                window.RequestFarcasterUserData = () => {
+                    console.log("📨 Unity requested Farcaster user context");
+                    window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
+                };
+
+                window.addEventListener("message", (ev) => {
+                    const d = ev.data;
+
+                    if (d?.type === "FARCASTER_USER_INFO") {
+                        const { username, pfpUrl } = d.payload || {};
+                        if (username) {
+                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                            console.log("👤 Username → Unity:", username);
+                        }
+                        if (pfpUrl) {
+                            unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+                            console.log("🖼️ PFP URL → Unity:", pfpUrl);
+                        }
+                    }
+
+                    if (d?.type === "UNITY_METHOD_CALL") {
+                        const method = d.method;
+                        const arg = d.args?.[0] || "0";
+
+                        if (method === "SetFarcasterFID") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterFID", arg);
+                        } else if (method === "SetUserInList") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetUserInList", arg);
+                        } else if (method === "SetFidGateState") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
+                        } else if (method === "SetPaymentSuccess") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetPaymentSuccess", arg);
+                        }
+                    }
+                });
+                // === End Farcaster Bridge ===
+
+            }).catch((err) => console.error("❌ Unity load failed:", err));
         };
         document.body.appendChild(script);
     </script>
