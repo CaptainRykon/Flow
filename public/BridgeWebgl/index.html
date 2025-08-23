@@ -1,41 +1,200 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
+<head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Unity Web Player | Anxious Frame</title>
-  </head>
-  <body style="text-align: center; padding: 0; border: 0; margin: 0;">
-    <canvas id="unity-canvas" width=432 height=900 tabindex="-1" style="width: 432px; height: 900px; background: #231F20"></canvas>
-    <script src="Build/Anxious Frame Example.loader.js"></script>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #unity-canvas {
+            display: block;
+            background: #000;
+        }
+
+        /* Overlay styling */
+        .overlay {
+            position: fixed;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .game-logo {
+            width: 140px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .game-title {
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-style: italic;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            opacity: 0.8;
+        }
+
+        /* Loading bar styling */
+        #unity-loading-bar {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            z-index: 11;
+        }
+
+        #unity-progress-bar-empty {
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        #unity-progress-bar-full {
+            background: #fff;
+            height: 8px;
+            width: 0%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="unity-container">
+        <canvas id="unity-canvas" width="432" height="900" tabindex="-1"></canvas>
+
+        <!-- Overlay -->
+        <div class="overlay">
+            <img class="game-logo" src="https://i.ibb.co/1fWQ3GLn/160-icon.png" alt="Game Logo">
+            <div class="game-title">Anxious Frame</div>
+            <div class="company-name">by Rykon Studios</div>
+        </div>
+
+        <!-- Loading bar -->
+        <div id="unity-loading-bar">
+            <div id="unity-progress-bar-empty">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+        </div>
+
+        <div id="unity-warning"></div>
+    </div>
+
     <script>
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
+        window.addEventListener("load", function () {
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.register("ServiceWorker.js");
+            }
+        });
 
         var canvas = document.querySelector("#unity-canvas");
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        canvas.style.position = "fixed";
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+        var warningBanner = document.querySelector("#unity-warning");
 
-        document.body.style.textAlign = "left";
-      }
+        function unityShowBanner(msg, type) {
+            console.log("Unity Banner:", msg, type);
+        }
 
-      createUnityInstance(document.querySelector("#unity-canvas"), {
-        arguments: [],
-        dataUrl: "Build/Anxious Frame Example.data",
-        frameworkUrl: "Build/Anxious Frame Example.framework.js",
-        codeUrl: "Build/Anxious Frame Example.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Rykon Studios",
-        productName: "Anxious Frame",
-        productVersion: "0.1.0",
-        // matchWebGLToCanvasSize: false, // Uncomment this to separately control WebGL canvas render size and DOM element size.
-        // devicePixelRatio: 1, // Uncomment this to override low DPI rendering on high DPI displays.
-      });
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
+        var config = {
+            arguments: [],
+            dataUrl: buildUrl + "/Anxious Frame Example.data",
+            frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
+            codeUrl: buildUrl + "/Anxious Frame Example.wasm",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "Rykon Studios",
+            productName: "Anxious Frame",
+            productVersion: "0.1.0",
+            showBanner: unityShowBanner,
+            splashScreenStyle: "Dark",
+            backgroundColor: "#000000"
+        };
+
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+            document.getElementsByTagName('head')[0].appendChild(meta);
+        }
+
+        loadingBar.style.display = "block";
+
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+                progressBarFull.style.width = (100 * progress) + "%";
+            }).then((unityInstance) => {
+                loadingBar.style.display = "none";
+                document.querySelector(".overlay").style.display = "none";
+
+                // === Farcaster Bridge Integration ===
+                window.UnityShareGame = () =>
+                    window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
+
+                window.UnityShareScore = (s) =>
+                    window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
+
+                window.RequestFarcasterUserData = () => {
+                    console.log("📨 Unity requested Farcaster user context");
+                    window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
+                };
+
+                window.addEventListener("message", (ev) => {
+                    const d = ev.data;
+
+                    if (d?.type === "FARCASTER_USER_INFO") {
+                        const { username, pfpUrl } = d.payload || {};
+                        if (username) {
+                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                            console.log("👤 Username → Unity:", username);
+                        }
+                        if (pfpUrl) {
+                            unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+                            console.log("🖼️ PFP URL → Unity:", pfpUrl);
+                        }
+                    }
+
+                    if (d?.type === "UNITY_METHOD_CALL") {
+                        const method = d.method;
+                        const arg = d.args?.[0] || "0";
+
+                        if (method === "SetFarcasterFID") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterFID", arg);
+                        } else if (method === "SetUserInList") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetUserInList", arg);
+                        } else if (method === "SetFidGateState") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
+                        } else if (method === "SetPaymentSuccess") {
+                            unityInstance.SendMessage("FarcasterBridge", "SetPaymentSuccess", arg);
+                        }
+                    }
+                });
+                // === End Farcaster Bridge ===
+
+            }).catch((err) => console.error("❌ Unity load failed:", err));
+        };
+        document.body.appendChild(script);
     </script>
-  </body>
+</body>
 </html>
