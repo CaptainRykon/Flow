@@ -1,7 +1,7 @@
 // src/lib/firebase.ts
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database"; // ✅ For Realtime DB
-import { getAnalytics } from "firebase/analytics";
+
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -18,6 +18,6 @@ const firebaseConfig = {
 // Initialize Firebase once
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const analytics = getAnalytics(app);
+
 
 export { db };
