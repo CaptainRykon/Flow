@@ -16,6 +16,7 @@ type UnityMessage =
   | { type: "FARCASTER_USER_INFO"; payload: { username: string; pfpUrl: string } }
   | { type: "UNITY_METHOD_CALL"; method: string; args: string[] };
 
+  
 type FrameActionMessage = {
   type: "frame-action";
   action:
