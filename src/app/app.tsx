@@ -9,14 +9,13 @@ import { useAccount, useConfig } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
 
 // import your client-side coin helpers
-import { getCoins, addCoins, subtractCoins } from "../utils/coins";
+import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 
 type FarcasterUserInfo = { username: string; pfpUrl: string; fid: string; };
 type UnityMessage =
   | { type: "FARCASTER_USER_INFO"; payload: { username: string; pfpUrl: string } }
   | { type: "UNITY_METHOD_CALL"; method: string; args: string[] };
 
-  
 type FrameActionMessage = {
   type: "frame-action";
   action:
@@ -31,6 +30,7 @@ type FrameActionMessage = {
   amount?: number;
   message?: string;
 };
+
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown; };
 
