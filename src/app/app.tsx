@@ -9,7 +9,7 @@ import { useAccount, useConfig } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
 
 // import your client-side coin helpers
-import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
+import { getCoins, addCoins, subtractCoins } from "~/utils/coins";
 
 type FarcasterUserInfo = { username: string; pfpUrl: string; fid: string; };
 type UnityMessage =
@@ -30,7 +30,6 @@ type FrameActionMessage = {
   amount?: number;
   message?: string;
 };
-
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown; };
 
