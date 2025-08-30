@@ -220,7 +220,13 @@ export default function App() {
             }
           }
 
-          if (isOpenUrlMessage(data)) sdk.actions.openUrl((data as any).url);
+          if (isOpenUrlMessage(data)) {
+             sdk.actions.openUrl(data.url);
+          }
+
+
+          
+          
         });
 
         window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
