@@ -105,17 +105,17 @@
             }
         });
 
-        var canvas = document.querySelector("#unity-canvas");
-        var loadingBar = document.querySelector("#unity-loading-bar");
-        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+        const canvas = document.querySelector("#unity-canvas");
+        const loadingBar = document.querySelector("#unity-loading-bar");
+        const progressBarFull = document.querySelector("#unity-progress-bar-full");
 
         function unityShowBanner(msg, type) {
             console.log("Unity Banner:", msg, type);
         }
 
-        var buildUrl = "Build";
-        var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
-        var config = {
+        const buildUrl = "Build";
+        const loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
+        const config = {
             arguments: [],
             dataUrl: buildUrl + "/Anxious Frame Example.data",
             frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
@@ -130,23 +130,21 @@
         };
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            var meta = document.createElement('meta');
+            const meta = document.createElement('meta');
             meta.name = 'viewport';
             meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-            document.getElementsByTagName('head')[0].appendChild(meta);
+            document.head.appendChild(meta);
         }
 
         loadingBar.style.display = "block";
 
-        var script = document.createElement("script");
+        const script = document.createElement("script");
         script.src = loaderUrl;
         script.onload = () => {
             createUnityInstance(canvas, config, (progress) => {
                 progressBarFull.style.width = (100 * progress) + "%";
             }).then((unityInstance) => {
-                // === this is the important addition ===
-                window.unityInstance = unityInstance; // <— make unity instance globally available
-                // ======================================
+                window.unityInstance = unityInstance;
 
                 loadingBar.style.display = "none";
                 document.querySelector(".overlay").style.display = "none";
@@ -163,36 +161,53 @@
                     window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
                 };
 
+                // === NEW: Daily Claim ===
+                window.DailyClaim = () => {
+                    console.log("🎁 Unity requested daily claim");
+                    window.parent.postMessage({ type: "frame-action", action: "daily-claim" }, "*");
+                };
+
+                // handle incoming messages from app.tsx
                 window.addEventListener("message", (ev) => {
                     const d = ev.data;
 
-                    if (d?.type === "FARCASTER_USER_INFO") {
+                    if (!d) return;
+
+                    // Farcaster user info
+                    if (d.type === "FARCASTER_USER_INFO") {
                         const { username, pfpUrl } = d.payload || {};
                         if (username) {
                             unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
-                            console.log("👤 Username → Unity:", username);
                         }
                         if (pfpUrl) {
                             unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
-                            console.log("🖼️ PFP URL → Unity:", pfpUrl);
                         }
                     }
 
-                    if (d?.type === "UNITY_METHOD_CALL") {
+                    // Unity method calls
+                    if (d.type === "UNITY_METHOD_CALL") {
                         const method = d.method;
                         const arg = d.args?.[0] || "0";
 
-                        if (method === "SetFarcasterFID") {
-                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterFID", arg);
-                        } else if (method === "SetUserInList") {
-                            unityInstance.SendMessage("FarcasterBridge", "SetUserInList", arg);
-                        } else if (method === "SetFidGateState") {
-                            unityInstance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
-                        } else if (method === "SetPaymentSuccess") {
-                            unityInstance.SendMessage("FarcasterBridge", "SetPaymentSuccess", arg);
-                        } else if (method === "UpdateCoins") {
-                            // you can now call UpdateCoins directly
-                            unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", arg);
+                        switch (method) {
+                            case "SetFarcasterFID":
+                            case "SetUserInList":
+                            case "SetFidGateState":
+                            case "SetPaymentSuccess":
+                                unityInstance.SendMessage("FarcasterBridge", method, arg);
+                                break;
+                            case "UpdateCoins":
+                                unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", arg);
+                                console.log("💰 Coins updated in Unity:", arg);
+                                break;
+                            case "OnCoinActionError":
+                                unityInstance.SendMessage("FarcasterBridge", "OnCoinActionError", arg);
+                                break;
+                            case "OnDailyClaimResult":
+                                // NEW: daily claim success/failure
+                                unityInstance.SendMessage("FarcasterBridge", "OnDailyClaimResult", arg);
+                                console.log("🎁 Daily claim result → Unity:", arg);
+                                break;
                         }
                     }
                 });
@@ -202,5 +217,6 @@
         };
         document.body.appendChild(script);
     </script>
+
 </body>
 </html>
