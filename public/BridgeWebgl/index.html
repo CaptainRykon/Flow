@@ -145,7 +145,6 @@
                 progressBarFull.style.width = (100 * progress) + "%";
             }).then((unityInstance) => {
                 window.unityInstance = unityInstance;
-
                 loadingBar.style.display = "none";
                 document.querySelector(".overlay").style.display = "none";
 
@@ -161,30 +160,34 @@
                     window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
                 };
 
-                // === NEW: Daily Claim ===
+                // === Daily Claim (updated) ===
                 window.DailyClaim = () => {
                     console.log("🎁 Unity requested daily claim");
-                    window.parent.postMessage({ type: "frame-action", action: "daily-claim" }, "*");
+                    window.parent.postMessage({ type: "frame-action", action: "claim-daily-coins" }, "*");
                 };
 
-                // handle incoming messages from app.tsx
+                // === Add/Spend/Get Coins ===
+                window.AddCoins = (amount) => {
+                    window.parent.postMessage({ type: "frame-action", action: "add-coins", amount: Number(amount) }, "*");
+                };
+                window.SpendCoins = (amount) => {
+                    window.parent.postMessage({ type: "frame-action", action: "spend-coins", amount: Number(amount) }, "*");
+                };
+                window.GetCoins = () => {
+                    window.parent.postMessage({ type: "frame-action", action: "get-coins" }, "*");
+                };
+
+                // === Handle incoming messages from React ===
                 window.addEventListener("message", (ev) => {
                     const d = ev.data;
-
                     if (!d) return;
 
-                    // Farcaster user info
                     if (d.type === "FARCASTER_USER_INFO") {
                         const { username, pfpUrl } = d.payload || {};
-                        if (username) {
-                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
-                        }
-                        if (pfpUrl) {
-                            unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
-                        }
+                        if (username) unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                        if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
                     }
 
-                    // Unity method calls
                     if (d.type === "UNITY_METHOD_CALL") {
                         const method = d.method;
                         const arg = d.args?.[0] || "0";
@@ -204,7 +207,6 @@
                                 unityInstance.SendMessage("FarcasterBridge", "OnCoinActionError", arg);
                                 break;
                             case "OnDailyClaimResult":
-                                // NEW: daily claim success/failure
                                 unityInstance.SendMessage("FarcasterBridge", "OnDailyClaimResult", arg);
                                 console.log("🎁 Daily claim result → Unity:", arg);
                                 break;
