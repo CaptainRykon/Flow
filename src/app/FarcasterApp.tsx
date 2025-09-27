@@ -9,7 +9,7 @@ import { useAccount, useConfig } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
 
 // coin helpers
-import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
+import { getCoins, addCoins, subtractCoins, claimDaily } from "@/utils/coins";
 
 type FarcasterUserInfo = { username: string; pfpUrl: string; fid: string };
 type UnityMessage =
@@ -34,7 +34,6 @@ type FrameActionMessage = {
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown };
 
-// ---- safe Window extensions (avoid any) ----
 declare global {
     interface Window {
         sendCoinsToUnity?: (amount: number) => void;
@@ -56,24 +55,41 @@ export default function FarcasterApp() {
     const { address, isConnected } = useAccount();
     const config = useConfig();
 
-    // Provide a helper so other code can push coins into Unity easily:
-    useEffect(() => {
-        if (typeof window === "undefined") return;
+    // --- Helper: retry until Unity iframe is ready ---
+    const postCoinsToUnity = async (amount: number) => {
+        if (!iframeRef.current) return;
 
-        window.sendCoinsToUnity = (amount: number) => {
-            try {
-                if (window.unityInstance && typeof window.unityInstance.SendMessage === "function") {
-                    window.unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", String(amount));
-                    return;
-                }
-                iframeRef.current?.contentWindow?.postMessage(
-                    { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(amount)] },
-                    "*"
-                );
-            } catch (err) {
-                console.error("Error sending coins to Unity:", err);
-            }
+        const send = () => {
+            const iw = iframeRef.current?.contentWindow;
+            if (!iw) return;
+            iw.postMessage({ type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(amount)] }, "*");
         };
+
+        let retries = 0;
+        const interval = setInterval(() => {
+            const iw = iframeRef.current?.contentWindow;
+            if (!iw || retries > 50) {
+                clearInterval(interval);
+                return;
+            }
+            send();
+            retries++;
+        }, 100);
+    };
+
+    const updateUnityCoins = async (fid: string) => {
+        try {
+            const coins = await getCoins(fid);
+            await postCoinsToUnity(coins);
+            console.log("💰 Sent coins to Unity:", coins);
+        } catch (err) {
+            console.error("❌ Failed sending coins to Unity:", err);
+        }
+    };
+
+    // Provide a global helper for external code
+    useEffect(() => {
+        window.sendCoinsToUnity = postCoinsToUnity;
     }, []);
 
     useEffect(() => {
@@ -109,22 +125,11 @@ export default function FarcasterApp() {
                 iframeRef.current?.addEventListener("load", async () => {
                     if (!mounted) return;
                     postToUnity();
-                    const fid = userInfoRef.current.fid;
-                    if (fid) {
-                        try {
-                            const coins = await getCoins(fid);
-                            iframeRef.current?.contentWindow?.postMessage(
-                                { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(coins)] },
-                                "*"
-                            );
-                            console.log("💰 Sent initial coins to Unity:", coins);
-                        } catch (e) {
-                            console.error("Failed fetching initial coins:", e);
-                        }
+                    if (userInfoRef.current.fid) {
+                        await updateUnityCoins(userInfoRef.current.fid);
                     }
                 });
 
-                // Global message handler
                 window.addEventListener("message", async (event: MessageEvent) => {
                     const raw = event.data as unknown;
                     if (!raw || typeof raw !== "object") return;
@@ -132,10 +137,55 @@ export default function FarcasterApp() {
 
                     if (obj.type === "frame-action") {
                         const actionData = obj as unknown as FrameActionMessage;
+                        const fid = userInfoRef.current.fid;
+                        if (!fid) return;
 
                         switch (actionData.action) {
                             case "get-user-context":
                                 postToUnity();
+                                await updateUnityCoins(fid);
+                                break;
+
+                            case "get-coins":
+                                await updateUnityCoins(fid);
+                                break;
+
+                            case "add-coins":
+                                if (typeof actionData.amount === "number") {
+                                    await addCoins(fid, actionData.amount);
+                                    await updateUnityCoins(fid);
+                                }
+                                break;
+
+                            case "spend-coins":
+                                if (typeof actionData.amount === "number") {
+                                    const ok = await subtractCoins(fid, actionData.amount);
+                                    if (!ok) {
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            { type: "UNITY_METHOD_CALL", method: "OnCoinSpendFailed", args: ["INSUFFICIENT"] },
+                                            "*"
+                                        );
+                                    }
+                                    await updateUnityCoins(fid);
+                                }
+                                break;
+
+                            case "claim-daily-coins":
+                                try {
+                                    const { success, coins } = await claimDaily(fid);
+                                    await postCoinsToUnity(coins);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        { type: "UNITY_METHOD_CALL", method: "ShowClaimResult", args: [success ? "1" : "0"] },
+                                        "*"
+                                    );
+                                    console.log("🎁 Daily claim result sent to Unity:", success, coins);
+                                } catch (err) {
+                                    console.error("❌ Daily claim failed:", err);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        { type: "UNITY_METHOD_CALL", method: "ShowClaimResult", args: ["0"] },
+                                        "*"
+                                    );
+                                }
                                 break;
 
                             case "request-payment": {
@@ -161,11 +211,7 @@ export default function FarcasterApp() {
                                         functionName: "transfer",
                                         args: [recipient, parseUnits("2", 6)],
                                     });
-                                    const txHash = await client.sendTransaction({
-                                        to: usdcContract,
-                                        data: txData,
-                                        value: 0n,
-                                    });
+                                    const txHash = await client.sendTransaction({ to: usdcContract, data: txData, value: 0n });
                                     console.log("✅ Transaction sent:", txHash);
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
@@ -189,139 +235,56 @@ export default function FarcasterApp() {
                                 );
                                 break;
 
-                            case "send-notification": {
-                                if (userInfoRef.current.fid) {
+                            case "send-notification":
+                                if (fid && actionData.message) {
                                     await fetch("/api/send-notification", {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({
-                                            fid: userInfoRef.current.fid,
-                                            title: "🎯 Farcaster Ping!",
-                                            body: actionData.message,
-                                        }),
+                                        body: JSON.stringify({ fid, title: "🎯 Farcaster Ping!", body: actionData.message }),
                                     });
-                                } else console.warn("❌ Cannot send notification, FID missing");
-                                break;
-                            }
-
-                            // ---------- coin actions ----------
-                            case "get-coins": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid) return;
-                                const coins = await getCoins(fid);
-                                iframeRef.current?.contentWindow?.postMessage(
-                                    { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(coins)] },
-                                    "*"
-                                );
-                                break;
-                            }
-
-                            case "spend-coins": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid || typeof actionData.amount !== "number") return;
-                                const ok = await subtractCoins(fid, actionData.amount);
-                                if (!ok) {
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "OnCoinSpendFailed", args: ["INSUFFICIENT"] },
-                                        "*"
-                                    );
-                                } else {
-                                    const newBalance = await getCoins(fid);
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(newBalance)] },
-                                        "*"
-                                    );
                                 }
                                 break;
-                            }
-
-                            case "add-coins": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid || typeof actionData.amount !== "number") return;
-                                await addCoins(fid, actionData.amount);
-                                const newBalance = await getCoins(fid);
-                                iframeRef.current?.contentWindow?.postMessage(
-                                    { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(newBalance)] },
-                                    "*"
-                                );
-                                break;
-                            }
-
-                            // ---------- daily claim ----------
-                            case "claim-daily-coins": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid) return;
-                                try {
-                                    // Example: award 50 coins daily
-                                    await addCoins(fid, 50);
-                                    const newBalance = await getCoins(fid);
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(newBalance)] },
-                                        "*"
-                                    );
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "ShowClaimResult", args: ["1"] },
-                                        "*"
-                                    );
-                                    console.log("🎁 Daily coins claimed for Unity!");
-                                } catch (err) {
-                                    console.error("❌ Daily claim failed:", err);
-                                    iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "ShowClaimResult", args: ["0"] },
-                                        "*"
-                                    );
-                                }
-                                break;
-                            }
                         }
                     }
 
-                    // open-url handlers
                     if (isOpenUrlMessage(raw)) {
-                        sdk.actions.openUrl((raw as { url: string }).url);
+                        sdk.actions.openUrl(raw.url);
                     }
 
-          // handle LOAD_GAME messages for iframe switching
-          if ((raw as Record<string, unknown>).type === "LOAD_GAME") {
-            const gameName = (raw as Record<string, unknown>).game;
-            if (typeof gameName === "string" && gameName.trim() !== "") {
-              iframeRef.current?.setAttribute("src", `/games/${gameName}/index.html`);
+                    if ((raw as Record<string, unknown>).type === "LOAD_GAME") {
+                        const gameName = (raw as Record<string, unknown>).game;
+                        if (typeof gameName === "string" && gameName.trim() !== "") {
+                            iframeRef.current?.setAttribute("src", `/games/${gameName}/index.html`);
+                        }
+                    }
+                });
+
+                window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
+                    const d = event.data as unknown;
+                    if (typeof d === "object" && d !== null && "type" in (d as Record<string, unknown>) && (d as Record<string, unknown>).type === "farcaster:frame-transaction") {
+                        console.log("✅ Frame Wallet transaction confirmed");
+                    }
+                });
+            } catch (err) {
+                console.error("❌ Error initializing bridge:", err);
             }
-          }
-        });
+        };
 
-        // listen for Frame transaction confirmations
-        window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
-          const d = event.data as unknown;
-          if (
-            typeof d === "object" &&
-            d !== null &&
-            "type" in (d as Record<string, unknown>) &&
-            (d as Record<string, unknown>).type === "farcaster:frame-transaction"
-          ) {
-            console.log("✅ Frame Wallet transaction confirmed");
-          }
-        });
-      } catch (err) {
-        console.error("❌ Error initializing bridge:", err);
-      }
-    };
+        init();
 
-    init();
+        return () => {
+            mounted = false;
+        };
+    }, [address, config, isConnected]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [address, config, isConnected]);
-
-  return (
-    <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
-      <iframe
-        ref={iframeRef}
-        src="/BridgeWebgl/index.html"
-        style={{ width: "100%", height: "100%", border: "none" }}
-        allowFullScreen
-      />
-    </div>
-  );
+    return (
+        <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+            <iframe
+                ref={iframeRef}
+                src="/BridgeWebgl/index.html"
+                style={{ width: "100%", height: "100%", border: "none" }}
+                allowFullScreen
+            />
+        </div>
+    );
 }
