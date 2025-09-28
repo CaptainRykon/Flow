@@ -55,21 +55,20 @@ export default function FarcasterApp() {
     const { address, isConnected } = useAccount();
     const config = useConfig();
 
-    /** helper to push coins back into Unity */
+    // --- Helper: retry until Unity iframe is ready ---
     const postCoinsToUnity = async (amount: number) => {
-        const iw = iframeRef.current?.contentWindow;
-        if (!iw) return;
+        if (!iframeRef.current) return;
 
-        // retry until Unity loaded
+        const send = () => {
+            const iw = iframeRef.current?.contentWindow;
+            if (!iw) return;
+            iw.postMessage({ type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(amount)] }, "*");
+        };
+
         let retries = 0;
-        const send = () =>
-            iw.postMessage(
-                { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(amount)] },
-                "*"
-            );
-
         const interval = setInterval(() => {
-            if (!iframeRef.current?.contentWindow || retries > 50) {
+            const iw = iframeRef.current?.contentWindow;
+            if (!iw || retries > 50) {
                 clearInterval(interval);
                 return;
             }
@@ -88,7 +87,7 @@ export default function FarcasterApp() {
         }
     };
 
-    // make helper globally available
+    // Provide a global helper for external code
     useEffect(() => {
         window.sendCoinsToUnity = postCoinsToUnity;
     }, []);
@@ -109,7 +108,6 @@ export default function FarcasterApp() {
                     fid: user && user.fid ? String(user.fid) : "",
                 };
 
-                /** send initial user info + fid gate to Unity */
                 const postToUnity = () => {
                     const iw = iframeRef.current?.contentWindow;
                     if (!iw) return;
@@ -136,10 +134,9 @@ export default function FarcasterApp() {
                     const raw = event.data as unknown;
                     if (!raw || typeof raw !== "object") return;
                     const obj = raw as Record<string, unknown>;
-                    const iw = iframeRef.current?.contentWindow;
 
                     if (obj.type === "frame-action") {
-                        const actionData = obj as FrameActionMessage;
+                        const actionData = obj as unknown as FrameActionMessage;
                         const fid = userInfoRef.current.fid;
                         if (!fid) return;
 
@@ -164,7 +161,7 @@ export default function FarcasterApp() {
                                 if (typeof actionData.amount === "number") {
                                     const ok = await subtractCoins(fid, actionData.amount);
                                     if (!ok) {
-                                        iw?.postMessage(
+                                        iframeRef.current?.contentWindow?.postMessage(
                                             { type: "UNITY_METHOD_CALL", method: "OnCoinSpendFailed", args: ["INSUFFICIENT"] },
                                             "*"
                                         );
@@ -177,14 +174,14 @@ export default function FarcasterApp() {
                                 try {
                                     const { success, coins } = await claimDaily(fid);
                                     await postCoinsToUnity(coins);
-                                    iw?.postMessage(
+                                    iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "ShowClaimResult", args: [success ? "1" : "0"] },
                                         "*"
                                     );
                                     console.log("🎁 Daily claim result sent to Unity:", success, coins);
                                 } catch (err) {
                                     console.error("❌ Daily claim failed:", err);
-                                    iw?.postMessage(
+                                    iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "ShowClaimResult", args: ["0"] },
                                         "*"
                                     );
@@ -216,7 +213,7 @@ export default function FarcasterApp() {
                                     });
                                     const txHash = await client.sendTransaction({ to: usdcContract, data: txData, value: 0n });
                                     console.log("✅ Transaction sent:", txHash);
-                                    iw?.postMessage(
+                                    iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
                                         "*"
                                     );
@@ -264,12 +261,7 @@ export default function FarcasterApp() {
 
                 window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
                     const d = event.data as unknown;
-                    if (
-                        typeof d === "object" &&
-                        d !== null &&
-                        "type" in (d as Record<string, unknown>) &&
-                        (d as Record<string, unknown>).type === "farcaster:frame-transaction"
-                    ) {
+                    if (typeof d === "object" && d !== null && "type" in (d as Record<string, unknown>) && (d as Record<string, unknown>).type === "farcaster:frame-transaction") {
                         console.log("✅ Frame Wallet transaction confirmed");
                     }
                 });
