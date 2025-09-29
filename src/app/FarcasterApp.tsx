@@ -1,18 +1,19 @@
-// src/app/app.tsx
 "use client";
 
 import { useEffect, useRef } from "react";
-import sdk from "@farcaster/frame-sdk";
-import { ALLOWED_FIDS } from "../utils/AllowedFids";
-import { parseUnits } from "ethers";
-import { encodeFunctionData } from "viem";
+import { useMiniKit, useComposeCast, useOpenUrl } from "@coinbase/onchainkit/minikit";
 import { useAccount, useConfig } from "wagmi";
 import { getWalletClient } from "wagmi/actions";
+import { parseUnits } from "ethers";
+import { encodeFunctionData } from "viem";
 
-// coin helpers
+import { ALLOWED_FIDS } from "../utils/AllowedFids";
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 
-type FarcasterUserInfo = { username: string; pfpUrl: string; fid: string };
+// user info types
+type UserInfo = { username: string; pfpUrl: string; fid: string };
+type MiniKitUser = { username?: string; pfpUrl?: string; fid?: string | number };
+
 type UnityMessage =
     | { type: "FARCASTER_USER_INFO"; payload: { username: string; pfpUrl: string } }
     | { type: "UNITY_METHOD_CALL"; method: string; args: string[] };
@@ -34,7 +35,6 @@ type FrameActionMessage = {
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown };
 
-// ---- safe Window extensions (avoid any) ----
 declare global {
     interface Window {
         sendCoinsToUnity?: (amount: number) => void;
@@ -47,73 +47,84 @@ declare global {
 function isOpenUrlMessage(msg: unknown): msg is { action: "open-url"; url: string } {
     if (typeof msg !== "object" || msg === null) return false;
     const r = msg as Record<string, unknown>;
-    return "action" in r && "url" in r && r.action === "open-url" && typeof r.url === "string";
+    return r.action === "open-url" && typeof r.url === "string";
 }
 
-export default function App() {
+export default function BaseApp() {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const userInfoRef = useRef<FarcasterUserInfo>({ username: "Guest", pfpUrl: "", fid: "" });
+    const userInfoRef = useRef<UserInfo>({ username: "Guest", pfpUrl: "", fid: "" });
+
+    // MiniKit (Base)
+    const { context, isFrameReady, setFrameReady } = useMiniKit();
+    const { composeCast } = useComposeCast();
+    const openUrl = useOpenUrl();
+
+    // wallet
     const { address, isConnected } = useAccount();
     const config = useConfig();
 
-    // Provide a helper so other code can push coins into Unity easily:
+    // global helper for Unity coins
     useEffect(() => {
         if (typeof window === "undefined") return;
-
         window.sendCoinsToUnity = (amount: number) => {
             try {
-                // If unityInstance exists in page, call SendMessage directly (some builds expose it)
-                if (window.unityInstance && typeof window.unityInstance.SendMessage === "function") {
+                if (window.unityInstance?.SendMessage) {
                     window.unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", String(amount));
                     return;
                 }
-
-                // Otherwise postMessage to iframe; page-level forwarder will call Unity SendMessage
                 iframeRef.current?.contentWindow?.postMessage(
                     { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(amount)] },
                     "*"
                 );
             } catch (err) {
-                // keep error typed-safe
-                // eslint-disable-next-line no-console
                 console.error("Error sending coins to Unity:", err);
             }
         };
     }, []);
 
+    // mark frame ready
+    useEffect(() => {
+        if (!isFrameReady) {
+            try {
+                setFrameReady();
+            } catch (err) {
+                console.warn("setFrameReady() failed:", err);
+            }
+        }
+    }, [isFrameReady, setFrameReady]);
+
+    // update userInfoRef whenever context changes
+    useEffect(() => {
+        // context.user may be undefined; cast to our MiniKitUser type with defaults
+        const rawUser: MiniKitUser | undefined = context?.user as MiniKitUser | undefined;
+        userInfoRef.current = {
+            username: rawUser?.username ?? "Guest",
+            pfpUrl: rawUser?.pfpUrl ?? "",
+            fid: rawUser?.fid ? String(rawUser.fid) : "",
+        };
+    }, [context]);
+
     useEffect(() => {
         let mounted = true;
 
+        const postToUnity = () => {
+            const iw = iframeRef.current?.contentWindow;
+            if (!iw) return;
+
+            const { username, pfpUrl, fid } = userInfoRef.current;
+            const isAllowed = ALLOWED_FIDS.includes(Number(fid));
+
+            const messages: UnityMessage[] = [
+                { type: "FARCASTER_USER_INFO", payload: { username, pfpUrl } },
+                { type: "UNITY_METHOD_CALL", method: "SetFarcasterFID", args: [fid] },
+                { type: "UNITY_METHOD_CALL", method: "SetFidGateState", args: [isAllowed ? "1" : "0"] },
+            ];
+            messages.forEach((msg) => iw.postMessage(msg, "*"));
+            console.log("✅ (Base) Posted info to Unity →", { username, fid, isAllowed });
+        };
+
         const init = async () => {
             try {
-                await sdk.actions.ready();
-                await sdk.actions.addFrame();
-
-                const context = await sdk.context;
-                const user = (context && (context as any).user) || {}; // sdk.context typing practical fallback
-                // fill user info (keep as strings)
-                userInfoRef.current = {
-                    username: (user && user.username) || "Guest",
-                    pfpUrl: (user && user.pfpUrl) || "",
-                    fid: user && user.fid ? String(user.fid) : "",
-                };
-
-                // post Farcaster user info to Unity (via iframe postMessage)
-                const postToUnity = () => {
-                    const iw = iframeRef.current?.contentWindow;
-                    if (!iw) return;
-                    const { username, pfpUrl, fid } = userInfoRef.current;
-                    const isAllowed = ALLOWED_FIDS.includes(Number(fid));
-                    const messages: UnityMessage[] = [
-                        { type: "FARCASTER_USER_INFO", payload: { username, pfpUrl } },
-                        { type: "UNITY_METHOD_CALL", method: "SetFarcasterFID", args: [fid] },
-                        { type: "UNITY_METHOD_CALL", method: "SetFidGateState", args: [isAllowed ? "1" : "0"] },
-                    ];
-                    messages.forEach((msg) => iw.postMessage(msg, "*"));
-                    console.log("✅ Posted info to Unity →", { username, fid, isAllowed });
-                };
-
-                // When iframe loads, push user context and current coins into Unity
                 iframeRef.current?.addEventListener("load", async () => {
                     if (!mounted) return;
                     postToUnity();
@@ -121,28 +132,26 @@ export default function App() {
                     if (fid) {
                         try {
                             const coins = await getCoins(fid);
-                            // send coin value into Unity (UpdateCoins)
                             iframeRef.current?.contentWindow?.postMessage(
                                 { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(coins)] },
                                 "*"
                             );
-                            console.log("💰 Sent initial coins to Unity:", coins);
+                            console.log("💰 (Base) Sent initial coins to Unity:", coins);
                         } catch (e) {
-                            console.error("Failed fetching initial coins:", e);
+                            console.error("Failed fetching initial coins (Base):", e);
                         }
                     }
                 });
 
-                // Global message handler (Unity -> parent)
-                window.addEventListener("message", async (event: MessageEvent) => {
+                // message handler
+                const onMessage = async (event: MessageEvent) => {
                     const raw = event.data as unknown;
                     if (!raw || typeof raw !== "object") return;
 
                     const obj = raw as Record<string, unknown>;
 
-                    // frame-action messages (Unity calling parent)
                     if (obj.type === "frame-action") {
-                        const actionData = obj as unknown as FrameActionMessage;
+                        const actionData = obj as FrameActionMessage;
 
                         switch (actionData.action) {
                             case "get-user-context":
@@ -183,45 +192,63 @@ export default function App() {
                                         data: txData,
                                         value: 0n,
                                     });
-                                    console.log("✅ Transaction sent:", txHash);
+                                    console.log("✅ (Base) Transaction sent:", txHash);
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
                                         "*"
                                     );
                                 } catch (err) {
-                                    console.error("❌ Payment failed:", err);
+                                    console.error("❌ Payment failed (Base):", err);
                                 }
                                 break;
                             }
 
-                            case "share-game":
-                                sdk.actions.openUrl(
-                                    `https://warpcast.com/~/compose?text= Loving Flow by @trenchverse ... &embeds[]=https://flow.trenchverse.com`
-                                );
+                            case "share-game": {
+                                try {
+                                    await composeCast?.({
+                                        text: `Loving Flow by @trenchverse — check it:`,
+                                        embeds: [window.location.href],
+                                    });
+                                } catch {
+                                    openUrl?.(window.location.href);
+                                }
                                 break;
+                            }
 
-                            case "share-score":
-                                sdk.actions.openUrl(
-                                    `https://warpcast.com/~/compose?text=🏆 I scored ${actionData.message} points!&embeds[]=https://flow.trenchverse.com`
-                                );
+                            case "share-score": {
+                                try {
+                                    await composeCast?.({
+                                        text: `🏆 I scored ${actionData.message} points! Can you beat me?`,
+                                        embeds: [window.location.href],
+                                    });
+                                } catch {
+                                    openUrl?.(window.location.href);
+                                }
                                 break;
+                            }
 
                             case "send-notification": {
-                                if (userInfoRef.current.fid) {
+                                if (!userInfoRef.current.fid) {
+                                    console.warn("❌ Cannot send notification, FID missing");
+                                    return;
+                                }
+                                try {
                                     await fetch("/api/send-notification", {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({
                                             fid: userInfoRef.current.fid,
-                                            title: "🎯 Farcaster Ping!",
+                                            title: "🎯 Base Ping!",
                                             body: actionData.message,
                                         }),
                                     });
-                                } else console.warn("❌ Cannot send notification, FID missing");
+                                } catch (err) {
+                                    console.warn("Notifications may not be supported in Base yet:", err);
+                                }
                                 break;
                             }
 
-                            // ---------- coin actions ----------
+                            // coin actions
                             case "get-coins": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid) return;
@@ -231,8 +258,8 @@ export default function App() {
                                         { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(coins)] },
                                         "*"
                                     );
-                                } catch (e) {
-                                    console.error("get-coins error:", e);
+                                } catch (err) {
+                                    console.error("get-coins error (Base):", err);
                                 }
                                 break;
                             }
@@ -254,8 +281,8 @@ export default function App() {
                                             "*"
                                         );
                                     }
-                                } catch (e) {
-                                    console.error("spend-coins error:", e);
+                                } catch (err) {
+                                    console.error("spend-coins error (Base):", err);
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "OnCoinActionError", args: ["SERVER_ERROR"] },
                                         "*"
@@ -274,8 +301,8 @@ export default function App() {
                                         { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(newBalance)] },
                                         "*"
                                     );
-                                } catch (e) {
-                                    console.error("add-coins error:", e);
+                                } catch (err) {
+                                    console.error("add-coins error (Base):", err);
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "OnCoinActionError", args: ["SERVER_ERROR"] },
                                         "*"
@@ -283,41 +310,52 @@ export default function App() {
                                 }
                                 break;
                             }
-                        } // end switch
-                    } // end frame-action check
-
-                    // open-url handlers
-                    if (isOpenUrlMessage(raw)) {
-                        sdk.actions.openUrl((raw as { url: string }).url);
+                        }
                     }
 
-                    // handle LOAD_GAME messages for iframe switching
+                    if (isOpenUrlMessage(raw)) {
+                        try {
+                            openUrl?.((raw as { url: string }).url);
+                        } catch {
+                            window.open((raw as { url: string }).url, "_blank");
+                        }
+                    }
+
                     if ((raw as Record<string, unknown>).type === "LOAD_GAME") {
                         const gameName = (raw as Record<string, unknown>).game;
                         if (typeof gameName === "string" && gameName.trim() !== "") {
                             iframeRef.current?.setAttribute("src", `/games/${gameName}/index.html`);
                         }
                     }
-                });
+                };
 
-                // listen for Frame transaction confirmations
-                window.addEventListener("message", (event: MessageEvent<FrameTransactionMessage>) => {
+                window.addEventListener("message", onMessage);
+
+                const onTx = (event: MessageEvent<FrameTransactionMessage>) => {
                     const d = event.data as unknown;
-                    if (typeof d === "object" && d !== null && "type" in (d as Record<string, unknown>) && (d as Record<string, unknown>).type === "farcaster:frame-transaction") {
-                        console.log("✅ Frame Wallet transaction confirmed");
+                    if (
+                        typeof d === "object" &&
+                        d !== null &&
+                        "type" in (d as Record<string, unknown>) &&
+                        (d as Record<string, unknown>).type === "farcaster:frame-transaction"
+                    ) {
+                        console.log("✅ Frame Wallet transaction confirmed (Base)");
                     }
-                });
+                };
+                window.addEventListener("message", onTx);
+
+                return () => {
+                    mounted = false;
+                    window.removeEventListener("message", onMessage);
+                    window.removeEventListener("message", onTx);
+                };
             } catch (err) {
-                console.error("❌ Error initializing bridge:", err);
+                console.error("❌ Error initializing Base bridge:", err);
             }
         };
 
         init();
-
-        return () => {
-            mounted = false;
-        };
-    }, [address, config, isConnected]);
+    }, [composeCast, openUrl, isFrameReady, address, config, isConnected]);
 
     return (
         <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
