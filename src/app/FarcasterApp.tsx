@@ -117,13 +117,14 @@ export default function FarcasterApp() {
                     const isAllowed = ALLOWED_FIDS.includes(Number(fid));
                     const messages: UnityMessage[] = [
                         { type: "FARCASTER_USER_INFO", payload: { username, pfpUrl } },
-                        { type: "UNITY_METHOD_CALL", method: "SetFarcasterFID", args: [fid] },
+                        { type: "UNITY_METHOD_CALL", method: "SetFarcasterFID", args: [fid || ""] },
                         { type: "UNITY_METHOD_CALL", method: "SetFidGateState", args: [isAllowed ? "1" : "0"] },
                     ];
                     messages.forEach((msg) => iw.postMessage(msg, "*"));
                     console.log("✅ Posted info to Unity →", { username, fid, isAllowed });
                 };
 
+                // send user info + coins when iframe loads
                 iframeRef.current?.addEventListener("load", async () => {
                     if (!mounted) return;
                     postToUnity();
@@ -141,7 +142,10 @@ export default function FarcasterApp() {
                     if (obj.type === "frame-action") {
                         const actionData = obj as FrameActionMessage;
                         const fid = userInfoRef.current.fid;
-                        if (!fid) return;
+                        if (!fid) {
+                            console.warn("⚠️ No fid yet for", actionData.action);
+                            return;
+                        }
 
                         switch (actionData.action) {
                             case "get-user-context":
