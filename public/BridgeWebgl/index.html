@@ -99,127 +99,108 @@
     </div>
 
     <script>
-        window.addEventListener("load", function () {
-            if ("serviceWorker" in navigator) {
-                navigator.serviceWorker.register("ServiceWorker.js");
+    window.addEventListener("load", function () {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("ServiceWorker.js");
+      }
+    });
+
+    var canvas = document.querySelector("#unity-canvas");
+    var loadingBar = document.querySelector("#unity-loading-bar");
+    var progressBarFull = document.querySelector("#unity-progress-bar-full");
+
+    function unityShowBanner(msg, type) {
+      console.log("Unity Banner:", msg, type);
+    }
+
+    var buildUrl = "Build";
+    var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
+    var config = {
+      arguments: [],
+      dataUrl: buildUrl + "/Anxious Frame Example.data",
+      frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
+      codeUrl: buildUrl + "/Anxious Frame Example.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "Rykon Studios",
+      productName: "Anxious Frame",
+      productVersion: "0.1.0",
+      showBanner: unityShowBanner,
+      splashScreenStyle: "Dark",
+      backgroundColor: "#000000"
+    };
+
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      var meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+      document.getElementsByTagName('head')[0].appendChild(meta);
+    }
+
+    loadingBar.style.display = "block";
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+      createUnityInstance(canvas, config, (progress) => {
+        progressBarFull.style.width = (100 * progress) + "%";
+      }).then((unityInstance) => {
+        // === this is the important addition ===
+        window.unityInstance = unityInstance; // <— make unity instance globally available
+        // ======================================
+
+        loadingBar.style.display = "none";
+        document.querySelector(".overlay").style.display = "none";
+
+        // === Farcaster Bridge Integration ===
+        window.UnityShareGame = () =>
+          window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
+
+        window.UnityShareScore = (s) =>
+          window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
+
+        window.RequestFarcasterUserData = () => {
+          console.log("📨 Unity requested Farcaster user context");
+          window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
+        };
+
+        window.addEventListener("message", (ev) => {
+          const d = ev.data;
+
+          if (d?.type === "FARCASTER_USER_INFO") {
+            const { username, pfpUrl } = d.payload || {};
+            if (username) {
+              unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+              console.log("👤 Username → Unity:", username);
             }
+            if (pfpUrl) {
+              unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+              console.log("🖼️ PFP URL → Unity:", pfpUrl);
+            }
+          }
+
+          if (d?.type === "UNITY_METHOD_CALL") {
+            const method = d.method;
+            const arg = d.args?.[0] || "0";
+
+            if (method === "SetFarcasterFID") {
+              unityInstance.SendMessage("FarcasterBridge", "SetFarcasterFID", arg);
+            } else if (method === "SetUserInList") {
+              unityInstance.SendMessage("FarcasterBridge", "SetUserInList", arg);
+            } else if (method === "SetFidGateState") {
+              unityInstance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
+            } else if (method === "SetPaymentSuccess") {
+              unityInstance.SendMessage("FarcasterBridge", "SetPaymentSuccess", arg);
+            } else if (method === "UpdateCoins") {
+              // you can now call UpdateCoins directly
+              unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", arg);
+            }
+          }
         });
+        // === End Farcaster Bridge ===
 
-        var canvas = document.querySelector("#unity-canvas");
-        var loadingBar = document.querySelector("#unity-loading-bar");
-        var progressBarFull = document.querySelector("#unity-progress-bar-full");
-
-        function unityShowBanner(msg, type) {
-            console.log("Unity Banner:", msg, type);
-        }
-
-        var buildUrl = "Build";
-        var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
-
-        var config = {
-            arguments: [],
-            dataUrl: buildUrl + "/Anxious Frame Example.data",
-            frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
-            codeUrl: buildUrl + "/Anxious Frame Example.wasm",
-            streamingAssetsUrl: "StreamingAssets",
-            companyName: "Rykon Studios",
-            productName: "Anxious Frame",
-            productVersion: "0.1.0",
-            showBanner: unityShowBanner,
-            splashScreenStyle: "Dark",
-            backgroundColor: "#000000"
-        };
-
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-            document.getElementsByTagName('head')[0].appendChild(meta);
-        }
-
-        loadingBar.style.display = "block";
-
-        var script = document.createElement("script");
-        script.src = loaderUrl;
-        script.onload = () => {
-            createUnityInstance(canvas, config, (progress) => {
-                progressBarFull.style.width = (100 * progress) + "%";
-            }).then((unityInstance) => {
-                window.unityInstance = unityInstance;
-                loadingBar.style.display = "none";
-                document.querySelector(".overlay").style.display = "none";
-
-                // === Farcaster Bridge Integration ===
-                window.UnityShareGame = () => window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
-                window.UnityShareScore = (s) => window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
-                window.RequestFarcasterUserData = () => {
-                    console.log("📨 Unity requested Farcaster user context");
-                    window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
-                };
-
-                // === Daily Claim System ===
-                window.DailyClaim = () => {
-                    console.log("🎁 Unity requested daily claim");
-                    window.parent.postMessage({ type: "frame-action", action: "claim-daily-coins" }, "*");
-                };
-
-                // === Coins System ===
-                window.AddCoins = (amount) => {
-                    window.parent.postMessage({ type: "frame-action", action: "add-coins", amount: Number(amount) }, "*");
-                };
-                window.SpendCoins = (amount) => {
-                    window.parent.postMessage({ type: "frame-action", action: "spend-coins", amount: Number(amount) }, "*");
-                };
-                window.GetCoins = () => {
-                    window.parent.postMessage({ type: "frame-action", action: "get-coins" }, "*");
-                };
-
-                // === Incoming messages from React ===
-                window.addEventListener("message", (ev) => {
-                    const d = ev.data;
-                    if (!d) return;
-
-                    if (d.type === "FARCASTER_USER_INFO") {
-                        const { username, pfpUrl } = d.payload || {};
-                        if (username) {
-                            unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
-                            console.log("👤 Username → Unity:", username);
-                        }
-                        if (pfpUrl) {
-                            unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
-                            console.log("🖼️ PFP URL → Unity:", pfpUrl);
-                        }
-                    }
-
-                    if (d.type === "UNITY_METHOD_CALL") {
-                        const method = d.method;
-                        const arg = d.args?.[0] || "0";
-
-                        switch (method) {
-                            case "SetFarcasterFID":
-                            case "SetUserInList":
-                            case "SetFidGateState":
-                            case "SetPaymentSuccess":
-                                unityInstance.SendMessage("FarcasterBridge", method, arg);
-                                break;
-                            case "UpdateCoins":
-                                unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", arg);
-                                break;
-                            case "OnCoinActionError":
-                                unityInstance.SendMessage("FarcasterBridge", "OnCoinActionError", arg);
-                                break;
-                            case "OnDailyClaimResult":
-                                unityInstance.SendMessage("FarcasterBridge", "OnDailyClaimResult", arg);
-                                console.log("🎁 Daily claim result → Unity:", arg);
-                                break;
-                        }
-                    }
-                });
-                // === End Farcaster Bridge ===
-
-            }).catch((err) => console.error("❌ Unity load failed:", err));
-        };
-        document.body.appendChild(script);
+      }).catch((err) => console.error("❌ Unity load failed:", err));
+    };
+    document.body.appendChild(script);
     </script>
 </body>
 </html>
