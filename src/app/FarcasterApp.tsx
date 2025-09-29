@@ -116,9 +116,8 @@ export default function FarcasterApp() {
                     const { username, pfpUrl, fid } = userInfoRef.current;
                     const isAllowed = ALLOWED_FIDS.includes(Number(fid));
                     const messages: UnityMessage[] = [
-                        { type: "UNITY_METHOD_CALL", method: "SetFarcasterUsername", args: [username || "Guest"] },
-                        { type: "UNITY_METHOD_CALL", method: "SetPfpUrl", args: [pfpUrl || ""] },
-                        { type: "UNITY_METHOD_CALL", method: "SetFarcasterFID", args: [fid || ""] },
+                        { type: "FARCASTER_USER_INFO", payload: { username, pfpUrl } },
+                        { type: "UNITY_METHOD_CALL", method: "SetFarcasterFID", args: [fid] },
                         { type: "UNITY_METHOD_CALL", method: "SetFidGateState", args: [isAllowed ? "1" : "0"] },
                     ];
                     messages.forEach((msg) => iw.postMessage(msg, "*"));
