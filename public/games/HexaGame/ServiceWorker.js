@@ -1,4 +1,4 @@
-const cacheName = "Rykon Studios-Final 13 Games-1.0";
+const cacheName = "Rykon Studios-HexaGame-1.0";
 const contentToCache = [
     "Build/Anxious Frame Example.loader.js",
     "Build/Anxious Frame Example.framework.js",

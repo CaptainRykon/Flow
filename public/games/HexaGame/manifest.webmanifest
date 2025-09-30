@@ -1,6 +1,6 @@
 {
-    "name": "Final 13 Games",
-    "short_name": "Final 13 Games",
+    "name": "HexaGame",
+    "short_name": "HexaGame",
     "start_url": "index.html",
     "display": "fullscreen",
     "background_color": "#231F20",
