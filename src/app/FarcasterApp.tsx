@@ -275,12 +275,17 @@ export default function FarcasterApp() {
           } 
 
           // handle LOAD_GAME messages for iframe switching 
-          if ((raw as Record<string, unknown>).type === "LOAD_GAME") { 
-            const gameName = (raw as Record<string, unknown>).game; 
-            if (typeof gameName === "string" && gameName.trim() !== "") { 
-              iframeRef.current?.setAttribute("src", '/games/${gameName}/index.html'); 
-            } 
-          } 
+            if ((raw as Record<string, unknown>).type === "LOAD_GAME") {
+                const gameName = (raw as Record<string, unknown>).game;
+                console.log("📩 LOAD_GAME received in React:", gameName);
+                if (typeof gameName === "string" && gameName.trim() !== "") {
+                    const url = `/games/${gameName}/index.html`;
+                    console.log("🔗 Setting iframe src to:", url);
+                    iframeRef.current?.setAttribute("src", url);
+                } else {
+                    console.warn("❌ Invalid gameName in LOAD_GAME:", gameName);
+                }
+            }
         }); 
 
         // listen for Frame transaction confirmations 
