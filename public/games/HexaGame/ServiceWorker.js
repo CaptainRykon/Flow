@@ -1,9 +1,9 @@
 const cacheName = "Rykon Studios-HexaGame-1.0";
 const contentToCache = [
-    "Build/Anxious Frame Example.loader.js",
-    "Build/Anxious Frame Example.framework.js",
-    "Build/Anxious Frame Example.data",
-    "Build/Anxious Frame Example.wasm",
+    "Build/HexaGame.loader.js",
+    "Build/HexaGame.framework.js",
+    "Build/HexaGame.data",
+    "Build/HexaGame.wasm",
     "TemplateData/style.css"
 
 ];
