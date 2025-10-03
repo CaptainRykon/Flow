@@ -63,7 +63,7 @@
         }
 
         #unity-progress-bar-empty {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255,255,255,0.2);
             height: 8px;
             border-radius: 4px;
         }
@@ -99,108 +99,104 @@
     </div>
 
     <script>
-    window.addEventListener("load", function () {
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("ServiceWorker.js");
-      }
-    });
+        window.addEventListener("load", function () {
+            if ("serviceWorker" in navigator) navigator.serviceWorker.register("ServiceWorker.js");
+        });
 
-    var canvas = document.querySelector("#unity-canvas");
-    var loadingBar = document.querySelector("#unity-loading-bar");
-    var progressBarFull = document.querySelector("#unity-progress-bar-full");
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
 
-    function unityShowBanner(msg, type) {
-      console.log("Unity Banner:", msg, type);
-    }
+        function unityShowBanner(msg, type) { console.log("Unity Banner:", msg, type); }
 
-    var buildUrl = "Build";
-    var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
-    var config = {
-      arguments: [],
-      dataUrl: buildUrl + "/Anxious Frame Example.data",
-      frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
-      codeUrl: buildUrl + "/Anxious Frame Example.wasm",
-      streamingAssetsUrl: "StreamingAssets",
-      companyName: "Rykon Studios",
-      productName: "Anxious Frame",
-      productVersion: "0.1.0",
-      showBanner: unityShowBanner,
-      splashScreenStyle: "Dark",
-      backgroundColor: "#000000"
-    };
-
-    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-      var meta = document.createElement('meta');
-      meta.name = 'viewport';
-      meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-      document.getElementsByTagName('head')[0].appendChild(meta);
-    }
-
-    loadingBar.style.display = "block";
-
-    var script = document.createElement("script");
-    script.src = loaderUrl;
-    script.onload = () => {
-      createUnityInstance(canvas, config, (progress) => {
-        progressBarFull.style.width = (100 * progress) + "%";
-      }).then((unityInstance) => {
-        // === this is the important addition ===
-        window.unityInstance = unityInstance; // <— make unity instance globally available
-        // ======================================
-
-        loadingBar.style.display = "none";
-        document.querySelector(".overlay").style.display = "none";
-
-        // === Farcaster Bridge Integration ===
-        window.UnityShareGame = () =>
-          window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
-
-        window.UnityShareScore = (s) =>
-          window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
-
-        window.RequestFarcasterUserData = () => {
-          console.log("📨 Unity requested Farcaster user context");
-          window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
+        var config = {
+            arguments: [],
+            dataUrl: buildUrl + "/Anxious Frame Example.data",
+            frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
+            codeUrl: buildUrl + "/Anxious Frame Example.wasm",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "Rykon Studios",
+            productName: "Anxious Frame",
+            productVersion: "0.1.0",
+            showBanner: unityShowBanner,
+            splashScreenStyle: "Dark",
+            backgroundColor: "#000000"
         };
 
-        window.addEventListener("message", (ev) => {
-          const d = ev.data;
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+            document.head.appendChild(meta);
+        }
 
-          if (d?.type === "FARCASTER_USER_INFO") {
-            const { username, pfpUrl } = d.payload || {};
-            if (username) {
-              unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
-              console.log("👤 Username → Unity:", username);
-            }
-            if (pfpUrl) {
-              unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
-              console.log("🖼️ PFP URL → Unity:", pfpUrl);
-            }
-          }
+        loadingBar.style.display = "block";
 
-          if (d?.type === "UNITY_METHOD_CALL") {
-            const method = d.method;
-            const arg = d.args?.[0] || "0";
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+                progressBarFull.style.width = (100 * progress) + "%";
+            }).then((unityInstance) => {
+                window.unityInstance = unityInstance;
+                loadingBar.style.display = "none";
+                document.querySelector(".overlay").style.display = "none";
 
-            if (method === "SetFarcasterFID") {
-              unityInstance.SendMessage("FarcasterBridge", "SetFarcasterFID", arg);
-            } else if (method === "SetUserInList") {
-              unityInstance.SendMessage("FarcasterBridge", "SetUserInList", arg);
-            } else if (method === "SetFidGateState") {
-              unityInstance.SendMessage("FarcasterBridge", "SetFidGateState", arg);
-            } else if (method === "SetPaymentSuccess") {
-              unityInstance.SendMessage("FarcasterBridge", "SetPaymentSuccess", arg);
-            } else if (method === "UpdateCoins") {
-              // you can now call UpdateCoins directly
-              unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", arg);
-            }
-          }
-        });
-        // === End Farcaster Bridge ===
+                // === Farcaster Bridge & Coins ===
+                window.UnityShareGame = () => window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
+                window.UnityShareScore = (s) => window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
+                window.RequestFarcasterUserData = () => {
+                    console.log("📨 Unity requested Farcaster user context");
+                    window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
+                };
 
-      }).catch((err) => console.error("❌ Unity load failed:", err));
-    };
-    document.body.appendChild(script);
+                // === Spin System Integration ===
+                window.SaveSpinData = (dailyChancesLeft, lastResetTime) => {
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "save-spin-data",
+                        data: { dailyChancesLeft: dailyChancesLeft, lastResetTime: lastResetTime }
+                    }, "*");
+                };
+
+                window.RequestSpinData = () => {
+                    window.parent.postMessage({ type: "frame-action", action: "get-spin-data" }, "*");
+                };
+
+                // === Message Listener ===
+                window.addEventListener("message", (ev) => {
+                    const d = ev.data;
+
+                    // Farcaster user info
+                    if (d?.type === "FARCASTER_USER_INFO") {
+                        const { username, pfpUrl } = d.payload || {};
+                        if (username) unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                        if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+                    }
+
+                    // Unity generic method calls
+                    if (d?.type === "UNITY_METHOD_CALL") {
+                        const method = d.method;
+                        const arg = d.args?.[0] || "0";
+
+                        unityInstance.SendMessage("FarcasterBridge", method, arg);
+                    }
+
+                    // Spin system: parent → Unity
+                    if (d?.type === "FARCASTER_SPIN_DATA") {
+                        const { dailyChancesLeft, lastResetTime } = d.payload || {};
+                        if (dailyChancesLeft !== undefined)
+                            unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
+                        if (lastResetTime)
+                            unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
+                    }
+                });
+
+            }).catch(err => console.error("❌ Unity load failed:", err));
+        };
+        document.body.appendChild(script);
     </script>
 </body>
 </html>

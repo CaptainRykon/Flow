@@ -9,6 +9,8 @@ import { getWalletClient } from "wagmi/actions";
 
 // coin helpers 
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins"; 
+// spin helpers
+import { getSpinData, setSpinData } from "@/utils/spins";
 
 type FarcasterUserInfo = { username: string; pfpUrl: string; fid: string }; 
 
@@ -26,9 +28,12 @@ type FrameActionMessage = {
     | "send-notification" 
     | "get-coins" 
     | "spend-coins" 
-    | "add-coins"; 
+    | "add-coins"
+    | "save-spin-data"
+    | "get-spin-data"; 
   amount?: number; 
   message?: string; 
+  data?: { dailyChancesLeft: number; lastResetTime: string }; 
 }; 
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown }; 
@@ -58,12 +63,10 @@ export default function FarcasterApp() {
     if (typeof window === "undefined") return; 
     window.sendCoinsToUnity = (amount: number) => { 
       try { 
-        // If unityInstance exists in page, call SendMessage directly (some builds expose it) 
         if (window.unityInstance && typeof window.unityInstance.SendMessage === "function") { 
           window.unityInstance.SendMessage("FarcasterBridge", "UpdateCoins", String(amount)); 
           return; 
         } 
-        // Otherwise postMessage to iframe; page-level forwarder will call Unity SendMessage 
         iframeRef.current?.contentWindow?.postMessage( 
           { type: "UNITY_METHOD_CALL", method: "UpdateCoins", args: [String(amount)] }, 
           "*" 
@@ -81,16 +84,14 @@ export default function FarcasterApp() {
         await sdk.actions.ready(); 
         await sdk.actions.addFrame(); 
         const context = await sdk.context; 
-        const user = (context && context.user) || {}; // sdk.context typing practical fallback 
+        const user = (context && context.user) || {}; 
 
-        // fill user info (keep as strings) 
         userInfoRef.current = { 
           username: (user && user.username) || "Guest", 
           pfpUrl: (user && user.pfpUrl) || "", 
           fid: user && user.fid ? String(user.fid) : "", 
         }; 
 
-        // post Farcaster user info to Unity (via iframe postMessage) 
         const postToUnity = () => { 
           const iw = iframeRef.current?.contentWindow; 
           if (!iw) return; 
@@ -105,7 +106,6 @@ export default function FarcasterApp() {
           console.log("✅ Posted info to Unity →", { username, fid, isAllowed }); 
         }; 
 
-        // When iframe loads, push user context and current coins into Unity 
         iframeRef.current?.addEventListener("load", async () => { 
           if (!mounted) return; 
           postToUnity(); 
@@ -124,15 +124,14 @@ export default function FarcasterApp() {
           } 
         }); 
 
-        // Global message handler (Unity -> parent) 
+        // --------- Global message handler (Unity -> parent) --------- 
         window.addEventListener("message", async (event: MessageEvent) => { 
           const raw = event.data as unknown; 
           if (!raw || typeof raw !== "object") return; 
           const obj = raw as Record<string, unknown>; 
 
-          // frame-action messages (Unity calling parent) 
           if (obj.type === "frame-action") { 
-            const actionData = obj as unknown as FrameActionMessage; 
+            const actionData = obj as FrameActionMessage; 
             switch (actionData.action) { 
               case "get-user-context": 
                 postToUnity(); 
@@ -266,26 +265,56 @@ export default function FarcasterApp() {
                 } 
                 break; 
               } 
-            } // end switch 
-          } // end frame-action check 
 
-          // open-url handlers 
+              // ---------- spin system actions ---------- 
+              case "save-spin-data": { 
+                const fid = userInfoRef.current.fid; 
+                if (!fid || !actionData.data) return; 
+                try { 
+                  await setSpinData(fid, actionData.data.dailyChancesLeft, actionData.data.lastResetTime); 
+                  console.log("🎯 Spin data saved:", actionData.data); 
+                } catch (e) { 
+                  console.error("save-spin-data error:", e); 
+                } 
+                break; 
+              } 
+              case "get-spin-data": { 
+                const fid = userInfoRef.current.fid; 
+                if (!fid) return; 
+                try { 
+                  const spinData = await getSpinData(fid); 
+                  iframeRef.current?.contentWindow?.postMessage( 
+                    { 
+                      type: "UNITY_METHOD_CALL", 
+                      method: "SetSpinData", 
+                      args: [String(spinData.dailyChancesLeft), String(spinData.lastResetTime)], 
+                    }, 
+                    "*" 
+                  ); 
+                  console.log("📩 Sent spin data to Unity:", spinData); 
+                } catch (e) { 
+                  console.error("get-spin-data error:", e); 
+                } 
+                break; 
+              } 
+            } 
+          } 
+
           if (isOpenUrlMessage(raw)) { 
             sdk.actions.openUrl((raw as { url: string }).url); 
           } 
 
-          // handle LOAD_GAME messages for iframe switching 
-            if ((raw as Record<string, unknown>).type === "LOAD_GAME") {
-                const gameName = (raw as Record<string, unknown>).game;
-                console.log("📩 LOAD_GAME received in React:", gameName);
-                if (typeof gameName === "string" && gameName.trim() !== "") {
-                    const url = `/games/${gameName}/index.html`;
-                    console.log("🔗 Setting iframe src to:", url);
-                    iframeRef.current?.setAttribute("src", url);
-                } else {
-                    console.warn("❌ Invalid gameName in LOAD_GAME:", gameName);
-                }
-            }
+          if ((raw as Record<string, unknown>).type === "LOAD_GAME") { 
+            const gameName = (raw as Record<string, unknown>).game; 
+            console.log("📩 LOAD_GAME received in React:", gameName); 
+            if (typeof gameName === "string" && gameName.trim() !== "") { 
+              const url = `/games/${gameName}/index.html`; 
+              console.log("🔗 Setting iframe src to:", url); 
+              iframeRef.current?.setAttribute("src", url); 
+            } else { 
+              console.warn("❌ Invalid gameName in LOAD_GAME:", gameName); 
+            } 
+          } 
         }); 
 
         // listen for Frame transaction confirmations 
