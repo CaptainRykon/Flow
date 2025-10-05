@@ -185,13 +185,12 @@
                     }
 
                     // Spin system: parent → Unity
-                    if (d?.type === "FARCASTER_SPIN_DATA") {
-                        const { dailyChancesLeft, lastResetTime } = d.payload || {};
-                        if (dailyChancesLeft !== undefined)
-                            unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
-                        if (lastResetTime)
-                            unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
+                    if (d?.type === "FARCASTER_SPIN_DATA" && d.payload) {
+                        const { dailyChancesLeft = 1, lastResetTime = new Date().toISOString() } = d.payload;
+                        unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
+                        unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
                     }
+
                 });
 
             }).catch(err => console.error("❌ Unity load failed:", err));
