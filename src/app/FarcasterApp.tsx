@@ -10,7 +10,7 @@ import { getWalletClient } from "wagmi/actions";
 
 // --- utils ---
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
-import { getSpinData, setSpinData } from "@/utils/spins";
+import { getSpinData, setSpinData, updateDailyChances } from "@/utils/spins";
 
 type FarcasterUserInfo = {
     username: string;
@@ -34,7 +34,8 @@ type FrameActionMessage = {
     | "spend-coins"
     | "add-coins"
     | "save-spin-data"
-    | "get-spin-data";
+    | "get-spin-data"
+    | "update-daily-chances";
     amount?: number;
     message?: string;
     data?: { dailyChancesLeft: number; lastResetTime: string };
@@ -136,6 +137,12 @@ export default function FarcasterApp() {
                         }
                     }
                 });
+
+
+
+
+
+
 
                 // 📨 Global message handler (Unity → React)
                 window.addEventListener("message", async (event: MessageEvent) => {
@@ -303,6 +310,8 @@ export default function FarcasterApp() {
                                 break;
                             }
 
+
+
                             case "get-spin-data": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid) return;
@@ -335,6 +344,19 @@ export default function FarcasterApp() {
                                 }
                                 break;
                             }
+
+                            case "update-daily-chances": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid || typeof actionData.amount !== "number") return;
+                                try {
+                                    await updateDailyChances(fid, actionData.amount);
+                                    console.log("✅ Daily chances updated in Firebase:", actionData.amount);
+                                } catch (e) {
+                                    console.error("❌ update-daily-chances error:", e);
+                                }
+                                break;
+                            }
+
                         }
                     }
 
