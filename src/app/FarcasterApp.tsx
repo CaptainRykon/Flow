@@ -35,7 +35,8 @@ type FrameActionMessage = {
     | "add-coins"
     | "save-spin-data"
     | "get-spin-data"
-    | "update-daily-chances";
+    | "update-daily-chances"
+    | "set-spin-data";
     amount?: number;
     message?: string;
     data?: { dailyChancesLeft: number; lastResetTime: string };
@@ -310,8 +311,6 @@ export default function FarcasterApp() {
                                 break;
                             }
 
-
-
                             case "get-spin-data": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid) return;
@@ -344,6 +343,7 @@ export default function FarcasterApp() {
                                 }
                                 break;
                             }
+
 
                             case "update-daily-chances": {
                                 const fid = userInfoRef.current.fid;

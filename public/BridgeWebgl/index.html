@@ -7,6 +7,7 @@
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
     <link rel="manifest" href="manifest.webmanifest">
+
     <style>
         body, html {
             margin: 0;
@@ -63,7 +64,7 @@
         }
 
         #unity-progress-bar-empty {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             height: 8px;
             border-radius: 4px;
         }
@@ -77,6 +78,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="unity-container">
         <canvas id="unity-canvas" width="432" height="900" tabindex="-1"></canvas>
@@ -99,8 +101,10 @@
     </div>
 
     <script>
+        // === Service Worker ===
         window.addEventListener("load", function () {
-            if ("serviceWorker" in navigator) navigator.serviceWorker.register("ServiceWorker.js");
+            if ("serviceWorker" in navigator)
+                navigator.serviceWorker.register("ServiceWorker.js");
         });
 
         var canvas = document.querySelector("#unity-canvas");
@@ -154,18 +158,23 @@
 
                 // === Spin System Integration ===
                 window.SaveSpinData = (dailyChancesLeft, lastResetTime) => {
+                    console.log("💾 [index.html] Forwarding SaveSpinData → React", { dailyChancesLeft, lastResetTime });
                     window.parent.postMessage({
                         type: "frame-action",
                         action: "save-spin-data",
-                        data: { dailyChancesLeft: dailyChancesLeft, lastResetTime: lastResetTime }
+                        data: { dailyChancesLeft, lastResetTime }
                     }, "*");
                 };
 
                 window.RequestSpinData = () => {
-                    window.parent.postMessage({ type: "frame-action", action: "get-spin-data" }, "*");
+                    console.log("📨 [index.html] Forwarding RequestSpinData → React");
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "get-spin-data"
+                    }, "*");
                 };
 
-                // === Message Listener ===
+                // === Listen for messages from React ===
                 window.addEventListener("message", (ev) => {
                     const d = ev.data;
 
@@ -176,25 +185,32 @@
                         if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
                     }
 
-                    // Unity generic method calls
+                    // Unity method calls (from React or elsewhere)
                     if (d?.type === "UNITY_METHOD_CALL") {
                         const method = d.method;
                         const arg = d.args?.[0] || "0";
-
                         unityInstance.SendMessage("FarcasterBridge", method, arg);
                     }
 
-                    // Spin system: parent → Unity
+                    // Spin system: React → Unity
                     if (d?.type === "FARCASTER_SPIN_DATA" && d.payload) {
                         const { dailyChancesLeft = 1, lastResetTime = new Date().toISOString() } = d.payload;
+                        console.log("🎯 [index.html] Received spin data from React → sending to Unity", d.payload);
                         unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
                         unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
                     }
 
+                    // Generic spin bridge (React returning via frame-action)
+                    if (d?.type === "frame-action" && d.action === "set-spin-data" && d.data) {
+                        const { dailyChancesLeft, lastResetTime } = d.data;
+                        console.log("🎯 [index.html] set-spin-data received:", d.data);
+                        unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
+                        unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
+                    }
                 });
-
             }).catch(err => console.error("❌ Unity load failed:", err));
         };
+
         document.body.appendChild(script);
     </script>
 </body>
