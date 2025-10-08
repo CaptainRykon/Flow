@@ -318,30 +318,21 @@ export default function FarcasterApp() {
                                 if (!fid) return;
 
                                 try {
-                                    const spinData = await getSpinData(fid);
+                                    let spinData = await getSpinData(fid);
 
-                                    // ✅ Only create a new entry if the user has no spin record at all
+                                    // ✅ Only create data for *brand new* users
                                     if (!spinData) {
                                         const newData = {
                                             dailyChancesLeft: 1,
                                             lastResetTime: new Date().toISOString(),
                                         };
                                         await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
-                                        console.log("🆕 New FID registered → Spin data initialized:", newData);
-
-                                        iframeRef.current?.contentWindow?.postMessage(
-                                            {
-                                                type: "UNITY_METHOD_CALL",
-                                                method: "SetSpinData",
-                                                args: [String(newData.dailyChancesLeft), String(newData.lastResetTime)],
-                                            },
-                                            "*"
-                                        );
-                                        return;
+                                        console.log("🆕 Created new spin record:", newData);
+                                        spinData = newData;
                                     }
 
-                                    // ✅ Ensure safe values (no negatives)
-                                    const safeChances = Math.max(0, Number(spinData.dailyChancesLeft ?? 0));
+                                    // ✅ Make sure chances never negative
+                                    const safeChances = Math.max(0, spinData.dailyChancesLeft);
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
                                     iframeRef.current?.contentWindow?.postMessage(
