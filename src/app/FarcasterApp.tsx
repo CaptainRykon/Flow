@@ -303,46 +303,64 @@ export default function FarcasterApp() {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid || !actionData.data) return;
                                 try {
-                                    await setSpinData(fid, actionData.data.dailyChancesLeft, actionData.data.lastResetTime);
-                                    console.log("🎯 Spin data saved to Firebase:", actionData.data);
+                                    const safeChances = Math.max(0, actionData.data.dailyChancesLeft);
+                                    await setSpinData(fid, safeChances, actionData.data.lastResetTime);
+                                    console.log("🎯 Spin data saved safely:", { fid, safeChances });
                                 } catch (e) {
                                     console.error("❌ save-spin-data error:", e);
                                 }
                                 break;
                             }
 
+
                             case "get-spin-data": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid) return;
-                                try {
-                                    let spinData = await getSpinData(fid);
 
-                                    // fallback defaults if no record exists
-                                    if (!spinData || typeof spinData.dailyChancesLeft === "undefined") {
-                                        spinData = {
+                                try {
+                                    const spinData = await getSpinData(fid);
+
+                                    // ✅ Only create a new entry if the user has no spin record at all
+                                    if (!spinData) {
+                                        const newData = {
                                             dailyChancesLeft: 1,
                                             lastResetTime: new Date().toISOString(),
                                         };
-                                        await setSpinData(fid, spinData.dailyChancesLeft, spinData.lastResetTime);
-                                        console.log("🆕 Created new spin data for user:", spinData);
+                                        await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
+                                        console.log("🆕 New FID registered → Spin data initialized:", newData);
+
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "SetSpinData",
+                                                args: [String(newData.dailyChancesLeft), String(newData.lastResetTime)],
+                                            },
+                                            "*"
+                                        );
+                                        return;
                                     }
 
-                                    // ensure Unity receives both values as strings
+                                    // ✅ Ensure safe values (no negatives)
+                                    const safeChances = Math.max(0, Number(spinData.dailyChancesLeft ?? 0));
+                                    const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
+
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
                                             type: "UNITY_METHOD_CALL",
                                             method: "SetSpinData",
-                                            args: [String(spinData.dailyChancesLeft), String(spinData.lastResetTime)],
+                                            args: [String(safeChances), String(safeResetTime)],
                                         },
                                         "*"
                                     );
 
-                                    console.log("📩 Sent spin data to Unity:", spinData);
+                                    console.log("📩 Sent spin data to Unity:", { dailyChancesLeft: safeChances, lastResetTime: safeResetTime });
+
                                 } catch (e) {
                                     console.error("❌ get-spin-data error:", e);
                                 }
                                 break;
                             }
+
 
 
                             case "update-daily-chances": {
