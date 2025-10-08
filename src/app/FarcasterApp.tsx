@@ -333,18 +333,17 @@ export default function FarcasterApp() {
                                 try {
                                     let spinData = await getSpinData(fid);
 
-                                    // ✅ Only create a new record for truly new users (no data in Firebase at all)
+                                    // 🆕 Only create new record for first-time users
                                     if (spinData === null) {
                                         const newData = {
-                                            dailyChancesLeft: 1,
+                                            dailyChancesLeft: 0, // start with no free spins
                                             lastResetTime: new Date().toISOString(),
                                         };
                                         await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
-                                        console.log("🆕 First-time player → Created initial spin data:", newData);
+                                        console.log("🆕 Created new spin data (starts with 0 spins):", newData);
                                         spinData = newData;
                                     }
 
-                                    // ✅ Never overwrite 0 to 1
                                     const safeChances = Math.max(0, Number(spinData.dailyChancesLeft));
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
@@ -357,12 +356,13 @@ export default function FarcasterApp() {
                                         "*"
                                     );
 
-                                    console.log("📩 Sent spin data to Unity:", { dailyChancesLeft: safeChances, lastResetTime: safeResetTime });
+                                    console.log("📩 Sent spin data to Unity:", { safeChances, safeResetTime });
                                 } catch (e) {
                                     console.error("❌ get-spin-data error:", e);
                                 }
                                 break;
                             }
+
 
 
 

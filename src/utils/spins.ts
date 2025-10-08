@@ -2,40 +2,40 @@
 import { db } from "../lib/firebase";
 
 /**
- * Create a new spin data entry only for brand new players.
- * Called only when no data exists.
+ * Create a new spin data entry for *brand new* players.
+ * Starts with 0 spins — countdown begins immediately.
  */
 export async function createNewSpinData(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
     const now = new Date().toISOString();
     await set(userRef, {
-        dailyChancesLeft: 1,
+        dailyChancesLeft: 0,
         lastResetTime: now,
     });
-    console.log(`🆕 Created new spin data for new FID: ${fid}`);
+    console.log(`🆕 Created new spin data for FID ${fid} → starts with 0 spins.`);
 }
 
 /**
- * Get spin data safely without modifying it.
- * Returns null if player has no record.
+ * Get spin data safely without modifying Firebase.
  */
 export async function getSpinData(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
     const snapshot = await get(userRef);
 
     if (!snapshot.exists()) {
-        console.log(`⚠️ No spin data found for FID ${fid}`);
-        return null; // React will handle creation
+        console.log(`⚠️ No spin data for FID ${fid}`);
+        return null;
     }
 
     const data = snapshot.val();
-    const dailyChancesLeft = Math.max(0, data.dailyChancesLeft ?? 0);
-    const lastResetTime = data.lastResetTime ?? new Date().toISOString();
-    return { dailyChancesLeft, lastResetTime };
+    return {
+        dailyChancesLeft: Math.max(0, data.dailyChancesLeft ?? 0),
+        lastResetTime: data.lastResetTime ?? new Date().toISOString(),
+    };
 }
 
 /**
- * Save both dailyChancesLeft and lastResetTime — called manually by Unity.
+ * Save updated spin data (called by Unity only when necessary).
  */
 export async function setSpinData(fid: string, dailyChancesLeft: number, lastResetTime: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
@@ -46,5 +46,5 @@ export async function setSpinData(fid: string, dailyChancesLeft: number, lastRes
         lastResetTime,
     });
 
-    console.log(`💾 setSpinData → FID=${fid} chances=${safeChances}, lastResetTime=${lastResetTime}`);
+    console.log(`💾 Saved spin data → FID=${fid}, chances=${safeChances}, reset=${lastResetTime}`);
 }
