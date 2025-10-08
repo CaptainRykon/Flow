@@ -299,19 +299,28 @@ export default function FarcasterApp() {
                             }
 
                             // 🎡 Spin system
+                            // 🎡 Spin System
                             case "save-spin-data": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid || !actionData.data) return;
+
                                 try {
                                     const safeChances = Math.max(0, actionData.data.dailyChancesLeft);
+
+                                    // ✅ Only update Firebase when Unity explicitly sends "save-spin-data"
+                                    // (Unity sends this when player uses their last spin)
                                     await setSpinData(fid, safeChances, actionData.data.lastResetTime);
-                                    console.log("🎯 Spin data saved safely:", { fid, safeChances });
+
+                                    console.log("🎯 Saved spin data after final spin:", {
+                                        fid,
+                                        dailyChancesLeft: safeChances,
+                                        lastResetTime: actionData.data.lastResetTime,
+                                    });
                                 } catch (e) {
                                     console.error("❌ save-spin-data error:", e);
                                 }
                                 break;
                             }
-
 
                             case "get-spin-data": {
                                 const fid = userInfoRef.current.fid;
@@ -320,18 +329,17 @@ export default function FarcasterApp() {
                                 try {
                                     let spinData = await getSpinData(fid);
 
-                                    // ✅ Only create data for *brand new* users
+                                    // ✅ If no record exists (new user), initialize 1 spin once
                                     if (!spinData) {
                                         const newData = {
                                             dailyChancesLeft: 1,
                                             lastResetTime: new Date().toISOString(),
                                         };
                                         await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
-                                        console.log("🆕 Created new spin record:", newData);
+                                        console.log("🆕 New FID initialized with 1 free spin:", newData);
                                         spinData = newData;
                                     }
 
-                                    // ✅ Make sure chances never negative
                                     const safeChances = Math.max(0, spinData.dailyChancesLeft);
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
@@ -344,13 +352,14 @@ export default function FarcasterApp() {
                                         "*"
                                     );
 
-                                    console.log("📩 Sent spin data to Unity:", { dailyChancesLeft: safeChances, lastResetTime: safeResetTime });
+                                    console.log("📩 Sent spin data to Unity:", { safeChances, safeResetTime });
 
                                 } catch (e) {
                                     console.error("❌ get-spin-data error:", e);
                                 }
                                 break;
                             }
+
 
 
 
