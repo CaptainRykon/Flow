@@ -2,7 +2,7 @@
 import { db } from "../lib/firebase";
 
 /**
- * Create a new spin data entry ONLY for brand new players.
+ * Create a new spin record only when a new FID joins.
  */
 export async function createNewSpinData(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
@@ -11,32 +11,30 @@ export async function createNewSpinData(fid: string) {
         dailyChancesLeft: 1,
         lastResetTime: now,
     });
-    console.log(`🆕 Created new spin data for FID ${fid}`);
+    console.log(`🆕 Created spin data for new FID: ${fid}`);
 }
 
 /**
- * Get spin data for an existing user.
- * Does NOT modify Firebase. Returns null if no record exists.
+ * Fetch spin data for a user. Returns null if user has no record.
  */
 export async function getSpinData(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
     const snapshot = await get(userRef);
 
     if (!snapshot.exists()) {
-        // ❌ Do NOT create anything here — return null instead
         console.log(`⚠️ No spin data found for FID ${fid}`);
         return null;
     }
 
     const data = snapshot.val();
-    const dailyChancesLeft = Math.max(0, data.dailyChancesLeft ?? 0);
-    const lastResetTime = data.lastResetTime ?? new Date().toISOString();
-    return { dailyChancesLeft, lastResetTime };
+    return {
+        dailyChancesLeft: Math.max(0, data.dailyChancesLeft ?? 0),
+        lastResetTime: data.lastResetTime ?? new Date().toISOString(),
+    };
 }
 
 /**
- * Save both dailyChancesLeft + lastResetTime.
- * Called when player uses their LAST free spin.
+ * Update Firebase only when the player uses their last spin.
  */
 export async function setSpinData(fid: string, dailyChancesLeft: number, lastResetTime: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
@@ -45,22 +43,18 @@ export async function setSpinData(fid: string, dailyChancesLeft: number, lastRes
         dailyChancesLeft: safeChances,
         lastResetTime,
     });
-    console.log(`💾 Updated spin data → chances=${safeChances}, reset=${lastResetTime}`);
+    console.log(`💾 Updated spin data (after final spin): chances=${safeChances}, reset=${lastResetTime}`);
 }
 
 /**
- * Update only the number of daily chances left (without touching lastResetTime).
+ * Only modify chances manually (does not touch lastResetTime).
  */
 export async function updateDailyChances(fid: string, amount: number) {
     const userRef = ref(db, "users/" + fid + "/spin");
     const snapshot = await get(userRef);
-
-    if (!snapshot.exists()) {
-        console.warn(`⚠️ Tried to update dailyChances for missing FID ${fid}`);
-        return;
-    }
+    if (!snapshot.exists()) return;
 
     const safeChances = Math.max(0, amount);
     await update(userRef, { dailyChancesLeft: safeChances });
-    console.log(`🔁 Updated dailyChancesLeft → ${safeChances}`);
+    console.log(`🔁 Updated only dailyChancesLeft → ${safeChances}`);
 }
