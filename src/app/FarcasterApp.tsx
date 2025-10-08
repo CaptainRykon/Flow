@@ -10,7 +10,7 @@ import { getWalletClient } from "wagmi/actions";
 
 // --- utils ---
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
-import { getSpinData, setSpinData, updateDailyChances } from "@/utils/spins";
+import { getSpinData, setSpinData} from "@/utils/spins";
 
 type FarcasterUserInfo = {
     username: string;
@@ -307,11 +307,15 @@ export default function FarcasterApp() {
                                 try {
                                     const safeChances = Math.max(0, actionData.data.dailyChancesLeft);
 
-                                    // ✅ Only update Firebase when Unity explicitly sends "save-spin-data"
-                                    // (Unity sends this when player uses their last spin)
-                                    await setSpinData(fid, safeChances, actionData.data.lastResetTime);
+                                    // ❌ Do NOT update Firebase when all spins are used (0)
+                                    if (safeChances === 0) {
+                                        console.log("🛑 Skipping Firebase update (spin data = 0) — waiting for 24h reset.");
+                                        return;
+                                    }
 
-                                    console.log("🎯 Saved spin data after final spin:", {
+                                    // ✅ Update Firebase only when dailyChancesLeft > 0
+                                    await setSpinData(fid, safeChances, actionData.data.lastResetTime);
+                                    console.log("🎯 Spin data saved to Firebase:", {
                                         fid,
                                         dailyChancesLeft: safeChances,
                                         lastResetTime: actionData.data.lastResetTime,
@@ -363,17 +367,6 @@ export default function FarcasterApp() {
 
 
 
-                            case "update-daily-chances": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid || typeof actionData.amount !== "number") return;
-                                try {
-                                    await updateDailyChances(fid, actionData.amount);
-                                    console.log("✅ Daily chances updated in Firebase:", actionData.amount);
-                                } catch (e) {
-                                    console.error("❌ update-daily-chances error:", e);
-                                }
-                                break;
-                            }
 
                         }
                     }

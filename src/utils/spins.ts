@@ -1,8 +1,8 @@
-﻿import { ref, get, update, set } from "firebase/database";
+﻿import { ref, get, set, update } from "firebase/database";
 import { db } from "../lib/firebase";
 
 /**
- * Create a new spin record only when a new FID joins.
+ * Create a new spin data entry only for brand new users.
  */
 export async function createNewSpinData(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
@@ -11,11 +11,11 @@ export async function createNewSpinData(fid: string) {
         dailyChancesLeft: 1,
         lastResetTime: now,
     });
-    console.log(`🆕 Created spin data for new FID: ${fid}`);
+    console.log(`🆕 Created new spin data for FID ${fid}`);
 }
 
 /**
- * Fetch spin data for a user. Returns null if user has no record.
+ * Fetch existing spin data. Returns null if user not found.
  */
 export async function getSpinData(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
@@ -34,27 +34,31 @@ export async function getSpinData(fid: string) {
 }
 
 /**
- * Update Firebase only when the player uses their last spin.
+ * Update Firebase only when spins reset (not when used up).
  */
 export async function setSpinData(fid: string, dailyChancesLeft: number, lastResetTime: string) {
+    if (dailyChancesLeft <= 0) {
+        console.log(`🛑 Not saving spin data with 0 spins — skip update.`);
+        return;
+    }
+
     const userRef = ref(db, "users/" + fid + "/spin");
-    const safeChances = Math.max(0, dailyChancesLeft);
     await update(userRef, {
-        dailyChancesLeft: safeChances,
+        dailyChancesLeft,
         lastResetTime,
     });
-    console.log(`💾 Updated spin data (after final spin): chances=${safeChances}, reset=${lastResetTime}`);
+    console.log(`💾 Updated spin data → chances=${dailyChancesLeft}, reset=${lastResetTime}`);
 }
 
 /**
- * Only modify chances manually (does not touch lastResetTime).
+ * Used when Unity resets spins after 24h countdown.
  */
-export async function updateDailyChances(fid: string, amount: number) {
+export async function resetDailySpin(fid: string) {
     const userRef = ref(db, "users/" + fid + "/spin");
-    const snapshot = await get(userRef);
-    if (!snapshot.exists()) return;
-
-    const safeChances = Math.max(0, amount);
-    await update(userRef, { dailyChancesLeft: safeChances });
-    console.log(`🔁 Updated only dailyChancesLeft → ${safeChances}`);
+    const now = new Date().toISOString();
+    await update(userRef, {
+        dailyChancesLeft: 1,
+        lastResetTime: now,
+    });
+    console.log(`🌅 Daily spin reset for FID ${fid}`);
 }
