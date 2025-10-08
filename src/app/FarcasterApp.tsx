@@ -351,11 +351,12 @@ export default function FarcasterApp() {
                                     const safeChances = Math.max(0, Number(spinData.dailyChancesLeft));
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
+                                    const formattedData = `${safeChances}|${safeResetTime}`;
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
                                             type: "UNITY_METHOD_CALL",
                                             method: "SetSpinData",
-                                            args: [String(safeChances), String(safeResetTime)],
+                                            args: [formattedData],
                                         },
                                         "*"
                                     );

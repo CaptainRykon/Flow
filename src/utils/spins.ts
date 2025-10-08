@@ -23,8 +23,11 @@ export async function getSpinData(fid: string) {
     const snapshot = await get(userRef);
 
     if (!snapshot.exists()) {
-        console.log(`⚠️ No spin data for FID ${fid}`);
-        return null;
+        // Brand-new user: start from 0, do not assign 1
+        const now = new Date().toISOString();
+        await set(userRef, { dailyChancesLeft: 0, lastResetTime: now });
+        console.log(`🆕 New user ${fid} created with 0 spins.`);
+        return { dailyChancesLeft: 0, lastResetTime: now };
     }
 
     const data = snapshot.val();
@@ -33,6 +36,7 @@ export async function getSpinData(fid: string) {
         lastResetTime: data.lastResetTime ?? new Date().toISOString(),
     };
 }
+
 
 /**
  * Save updated spin data (called by Unity only when necessary).
