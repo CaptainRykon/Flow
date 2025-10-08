@@ -299,23 +299,15 @@ export default function FarcasterApp() {
                             }
 
                             // 🎡 Spin system
-                            // 🎡 Spin System
                             case "save-spin-data": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid || !actionData.data) return;
 
                                 try {
                                     const safeChances = Math.max(0, actionData.data.dailyChancesLeft);
-
-                                    // ❌ Do NOT update Firebase when all spins are used (0)
-                                    if (safeChances === 0) {
-                                        console.log("🛑 Skipping Firebase update (spin data = 0) — waiting for 24h reset.");
-                                        return;
-                                    }
-
-                                    // ✅ Update Firebase only when dailyChancesLeft > 0
                                     await setSpinData(fid, safeChances, actionData.data.lastResetTime);
-                                    console.log("🎯 Spin data saved to Firebase:", {
+
+                                    console.log("💾 Updated Firebase spin data:", {
                                         fid,
                                         dailyChancesLeft: safeChances,
                                         lastResetTime: actionData.data.lastResetTime,
@@ -331,19 +323,31 @@ export default function FarcasterApp() {
                                 if (!fid) return;
 
                                 try {
-                                    let spinData = await getSpinData(fid);
+                                    // 🟡 Always get fresh spin data directly from Firebase
+                                    const spinData = await getSpinData(fid);
 
-                                    // 🆕 Only create new record for first-time users
-                                    if (spinData === null) {
+                                    if (!spinData) {
+                                        console.log("🆕 New user detected — creating spin data with 0 chances.");
                                         const newData = {
-                                            dailyChancesLeft: 0, // start with no free spins
+                                            dailyChancesLeft: 0,
                                             lastResetTime: new Date().toISOString(),
                                         };
                                         await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
-                                        console.log("🆕 Created new spin data (starts with 0 spins):", newData);
-                                        spinData = newData;
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "SetSpinData",
+                                                args: [
+                                                    String(newData.dailyChancesLeft),
+                                                    String(newData.lastResetTime),
+                                                ],
+                                            },
+                                            "*"
+                                        );
+                                        return;
                                     }
 
+                                    // ✅ Sync latest values from Firebase to Unity
                                     const safeChances = Math.max(0, Number(spinData.dailyChancesLeft));
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
@@ -356,12 +360,16 @@ export default function FarcasterApp() {
                                         "*"
                                     );
 
-                                    console.log("📩 Sent spin data to Unity:", { safeChances, safeResetTime });
+                                    console.log("📩 Synced spin data from Firebase → Unity:", {
+                                        dailyChancesLeft: safeChances,
+                                        lastResetTime: safeResetTime,
+                                    });
                                 } catch (e) {
                                     console.error("❌ get-spin-data error:", e);
                                 }
                                 break;
                             }
+
 
 
 
