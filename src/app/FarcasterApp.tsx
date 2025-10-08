@@ -333,18 +333,19 @@ export default function FarcasterApp() {
                                 try {
                                     let spinData = await getSpinData(fid);
 
-                                    // ✅ If no record exists (new user), initialize 1 spin once
-                                    if (!spinData) {
+                                    // ✅ Only create a new record for truly new users (no data in Firebase at all)
+                                    if (spinData === null) {
                                         const newData = {
                                             dailyChancesLeft: 1,
                                             lastResetTime: new Date().toISOString(),
                                         };
                                         await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
-                                        console.log("🆕 New FID initialized with 1 free spin:", newData);
+                                        console.log("🆕 First-time player → Created initial spin data:", newData);
                                         spinData = newData;
                                     }
 
-                                    const safeChances = Math.max(0, spinData.dailyChancesLeft);
+                                    // ✅ Never overwrite 0 to 1
+                                    const safeChances = Math.max(0, Number(spinData.dailyChancesLeft));
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
                                     iframeRef.current?.contentWindow?.postMessage(
@@ -356,13 +357,13 @@ export default function FarcasterApp() {
                                         "*"
                                     );
 
-                                    console.log("📩 Sent spin data to Unity:", { safeChances, safeResetTime });
-
+                                    console.log("📩 Sent spin data to Unity:", { dailyChancesLeft: safeChances, lastResetTime: safeResetTime });
                                 } catch (e) {
                                     console.error("❌ get-spin-data error:", e);
                                 }
                                 break;
                             }
+
 
 
 
