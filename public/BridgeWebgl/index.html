@@ -192,6 +192,17 @@
                         unityInstance.SendMessage("FarcasterBridge", method, arg);
                     }
 
+                    if (d?.type === "UNITY_METHOD_CALL") {
+                        const method = d.method;
+                        const arg = d.args?.[0] || "0";
+
+                        // 👇 Send SetSpinData to SpinManager instead of FarcasterBridge
+                        const targetObject = (method === "SetSpinData") ? "SpinManager" : "FarcasterBridge";
+
+                        unityInstance.SendMessage(targetObject, method, arg);
+                    }
+
+
                     // Spin system: React → Unity
                     if (d?.type === "FARCASTER_SPIN_DATA" && d.payload) {
                         const { dailyChancesLeft = 1, lastResetTime = new Date().toISOString() } = d.payload;
