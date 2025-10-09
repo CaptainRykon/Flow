@@ -372,12 +372,6 @@ export default function FarcasterApp() {
                             }
 
 
-
-
-
-
-
-
                         }
                     }
 
