@@ -10,7 +10,8 @@ import { getWalletClient } from "wagmi/actions";
 
 // --- utils ---
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
-import { getSpinData, setSpinData} from "@/utils/spins";
+import { getSpinData, setSpinData } from "@/utils/spins";
+import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 
 type FarcasterUserInfo = {
     username: string;
@@ -36,7 +37,9 @@ type FrameActionMessage = {
     | "save-spin-data"
     | "get-spin-data"
     | "update-daily-chances"
-    | "set-spin-data";
+    | "set-spin-data"
+    | "get-daily-reward-data"
+    | "save-daily-reward-claim";
     amount?: number;
     message?: string;
     data?: { dailyChancesLeft: number; lastResetTime: string };
@@ -277,6 +280,42 @@ export default function FarcasterApp() {
                                 }
                                 break;
                             }
+
+
+
+                            // inside switch(actionData.action)
+                            case "get-daily-reward-data": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                try {
+                                    const data = await getDailyRewardData(fid);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetDailyRewardData",
+                                            args: [`${data.lastClaimTime}|${data.claimedToday}`],
+                                        },
+                                        "*"
+                                    );
+                                } catch (e) {
+                                    console.error("❌ get-daily-reward-data error:", e);
+                                }
+                                break;
+                            }
+
+                            case "save-daily-reward-claim": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                try {
+                                    await saveDailyRewardClaim(fid);
+                                } catch (e) {
+                                    console.error("❌ save-daily-reward-claim error:", e);
+                                }
+                                break;
+                            }
+
 
                             case "add-coins": {
                                 const fid = userInfoRef.current.fid;
