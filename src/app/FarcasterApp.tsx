@@ -12,6 +12,7 @@ import { getWalletClient } from "wagmi/actions";
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 import { getSpinData, setSpinData } from "@/utils/spins";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
+import { getPassData, savePassData } from "@/utils/passes";
 
 type FarcasterUserInfo = {
     username: string;
@@ -39,10 +40,27 @@ type FrameActionMessage = {
     | "update-daily-chances"
     | "set-spin-data"
     | "get-daily-reward-data"
-    | "save-daily-reward-claim";
+    | "save-daily-reward-claim"
+    | "get-shop-pass-data"
+    | "save-shop-pass-data"
+    | "request-pass-payment";
     amount?: number;
     message?: string;
-    data?: { dailyChancesLeft: number; lastResetTime: string };
+
+    // 💳 Used for payments
+    passType?: string;
+    expiry?: string;
+
+
+    // 🔹 Flexible data payload for spin, reward, and pass info
+    data?: {
+        dailyChancesLeft?: number;
+        lastResetTime?: string;
+        passType?: string;
+        expiry?: string;
+    };
+
+ 
 };
 
 type FrameTransactionMessage = { type: "farcaster:frame-transaction"; data?: unknown };
@@ -343,19 +361,119 @@ export default function FarcasterApp() {
                                 if (!fid || !actionData.data) return;
 
                                 try {
-                                    const safeChances = Math.max(0, actionData.data.dailyChancesLeft);
-                                    await setSpinData(fid, safeChances, actionData.data.lastResetTime);
+                                    const safeChances = Math.max(0, actionData.data.dailyChancesLeft ?? 0);
+                                    const safeReset = actionData.data.lastResetTime ?? new Date().toISOString();
+
+                                    await setSpinData(fid, safeChances, safeReset);
 
                                     console.log("💾 Updated Firebase spin data:", {
                                         fid,
                                         dailyChancesLeft: safeChances,
-                                        lastResetTime: actionData.data.lastResetTime,
+                                        lastResetTime: safeReset,
                                     });
                                 } catch (e) {
                                     console.error("❌ save-spin-data error:", e);
                                 }
                                 break;
                             }
+
+
+
+                            // 🏆 SHOP PASS SYSTEM
+                            case "get-shop-pass-data": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+                                try {
+                                    const pass = await getPassData(fid);
+                                    const formatted = `${pass.passType}|${pass.expiry}`;
+                                    iframeRef.current?.contentWindow?.postMessage({
+                                        type: "UNITY_METHOD_CALL",
+                                        method: "SetPassData",
+                                        args: [formatted],
+                                    }, "*");
+                                    console.log("📦 Sent pass data to Unity:", formatted);
+                                } catch (e) {
+                                    console.error("❌ get-shop-pass-data error:", e);
+                                }
+                                break;
+                            }
+
+                            case "save-shop-pass-data": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid || !actionData.data) return;
+                                try {
+                                    const { passType, expiry } = actionData.data;
+                                    const safePassType = passType ?? "Free";
+                                    const safeExpiry = expiry ?? new Date().toISOString();
+
+                                    await savePassData(fid, safePassType, safeExpiry);
+                                    console.log("💾 Saved shop pass data →", { fid, passType, expiry });
+                                } catch (e) {
+                                    console.error("❌ save-shop-pass-data error:", e);
+                                }
+                                break;
+                            }
+
+                            // 💳 Handle pass payments
+                            case "request-pass-payment": {
+                                if (!isConnected) {
+                                    console.warn("❌ Wallet not connected.");
+                                    return;
+                                }
+                                try {
+                                    const client = await getWalletClient(config);
+                                    if (!client) {
+                                        console.error("❌ Wallet client not available");
+                                        return;
+                                    }
+
+                                    const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
+                                    const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+                                    const amountNum: number = actionData.amount ?? 0;
+                                    const amountStr: string = amountNum.toString();
+                                    const passType: string = actionData.passType ?? "UNKNOWN_PASS";
+
+                                    const txData = encodeFunctionData({
+                                        abi: [
+                                            {
+                                                name: "transfer",
+                                                type: "function",
+                                                stateMutability: "nonpayable",
+                                                inputs: [
+                                                    { name: "to", type: "address" },
+                                                    { name: "amount", type: "uint256" },
+                                                ],
+                                                outputs: [{ name: "", type: "bool" }],
+                                            },
+                                        ],
+                                        functionName: "transfer",
+                                        args: [recipient, parseUnits(amountStr, 6)],
+                                    });
+
+                                    const txHash = await client.sendTransaction({
+                                        to: usdcContract,
+                                        data: txData,
+                                        value: 0n,
+                                    });
+
+                                    console.log(`✅ ${passType} payment complete → TX:`, txHash);
+
+                                    iframeRef.current?.contentWindow?.postMessage({
+                                        type: "UNITY_METHOD_CALL",
+                                        method: "OnPaymentSuccess",
+                                        args: [passType],
+                                    }, "*");
+
+                                } catch (err) {
+                                    console.error("❌ request-pass-payment error:", err);
+                                }
+                                break;
+                            }
+
+
+
+
 
                             case "get-spin-data": {
                                 const fid = userInfoRef.current.fid;

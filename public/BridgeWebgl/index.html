@@ -174,7 +174,6 @@
                     }, "*");
                 };
 
-
                 // === Daily Reward System Integration ===
                 window.RequestDailyRewardData = () => {
                     console.log("📨 [index.html] Forwarding RequestDailyRewardData → React");
@@ -192,6 +191,34 @@
                     }, "*");
                 };
 
+                // === 🏆 Shop Pass System Integration ===
+                window.RequestShopPassData = () => {
+                    console.log("📨 [index.html] Forwarding RequestShopPassData → React");
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "get-shop-pass-data"
+                    }, "*");
+                };
+
+                window.SaveShopPassData = (passType, expiry) => {
+                    console.log("💾 [index.html] Forwarding SaveShopPassData → React", { passType, expiry });
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "save-shop-pass-data",
+                        data: { passType, expiry }
+                    }, "*");
+                };
+
+                window.RequestPassPayment = (amount, passType) => {
+                    console.log(`💳 [index.html] Requesting pass payment → ${amount} USDC for ${passType}`);
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "request-pass-payment",
+                        amount: Number(amount),
+                        passType: passType
+                    }, "*");
+                };
+
                 // === Listen for messages from React ===
                 window.addEventListener("message", (ev) => {
                     const d = ev.data;
@@ -203,51 +230,34 @@
                         if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
                     }
 
-                    // Unity method calls (from React or elsewhere)
+                    // Unity method calls (from React)
                     if (d?.type === "UNITY_METHOD_CALL") {
                         const method = d.method;
                         const arg = d.args?.[0] || "0";
-                        unityInstance.SendMessage("FarcasterBridge", method, arg);
+
+                        // Send SetSpinData to SpinManager instead of FarcasterBridge
+                        const targetObject = (method === "SetSpinData") ? "SpinManager" : "FarcasterBridge";
+                        unityInstance.SendMessage(targetObject, method, arg);
                     }
 
-
-
-                    // Daily reward data coming from React → Unity
+                    // Daily reward data from React → Unity
                     if (d?.type === "UNITY_METHOD_CALL" && d.method === "SetDailyRewardData") {
-                        console.log("🎁 [index.html] Received daily reward data → sending to Unity", d.args);
                         const arg = d.args?.[0] || "";
                         unityInstance.SendMessage("FarcasterBridge", "SetDailyRewardData", arg);
                     }
 
-
-
-
-
-                    if (d?.type === "UNITY_METHOD_CALL") {
-                        const method = d.method;
-                        const arg = d.args?.[0] || "0";
-
-                        // 👇 Send SetSpinData to SpinManager instead of FarcasterBridge
-                        const targetObject = (method === "SetSpinData") ? "SpinManager" : "FarcasterBridge";
-
-                        unityInstance.SendMessage(targetObject, method, arg);
+                    // 🏆 Shop Pass data from React → Unity
+                    if (d?.type === "UNITY_METHOD_CALL" && d.method === "SetPassData") {
+                        const arg = d.args?.[0] || "";
+                        console.log("🎟️ [index.html] Received pass data from React → sending to Unity:", arg);
+                        unityInstance.SendMessage("PassManager", "SetPassData", arg);
                     }
 
-
-                    // Spin system: React → Unity
-                    if (d?.type === "FARCASTER_SPIN_DATA" && d.payload) {
-                        const { dailyChancesLeft = 1, lastResetTime = new Date().toISOString() } = d.payload;
-                        console.log("🎯 [index.html] Received spin data from React → sending to Unity", d.payload);
-                        unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
-                        unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
-                    }
-
-                    // Generic spin bridge (React returning via frame-action)
-                    if (d?.type === "frame-action" && d.action === "set-spin-data" && d.data) {
-                        const { dailyChancesLeft, lastResetTime } = d.data;
-                        console.log("🎯 [index.html] set-spin-data received:", d.data);
-                        unityInstance.SendMessage("FarcasterBridge", "SetDailyChancesLeft", dailyChancesLeft.toString());
-                        unityInstance.SendMessage("FarcasterBridge", "SetLastResetTime", lastResetTime);
+                    // ✅ Payment success callback from React → Unity
+                    if (d?.type === "UNITY_METHOD_CALL" && d.method === "OnPaymentSuccess") {
+                        const passType = d.args?.[0] || "UNKNOWN_PASS";
+                        console.log(`✅ [index.html] Payment success for ${passType}`);
+                        unityInstance.SendMessage("PassManager", "OnPaymentSuccess", passType);
                     }
                 });
             }).catch(err => console.error("❌ Unity load failed:", err));
