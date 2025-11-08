@@ -27,7 +27,7 @@ export async function getSpinData(fid: string) {
         const now = new Date().toISOString();
         await set(userRef, { dailyChancesLeft: 0, lastResetTime: now });
         console.log(`🆕 New user ${fid} created with 0 spins.`);
-        return { dailyChancesLeft: 0, lastResetTime: now };
+        return { dailyChancesLeft: 1, lastResetTime: now };
     }
 
     const data = snapshot.val();

@@ -480,31 +480,8 @@ export default function FarcasterApp() {
                                 if (!fid) return;
 
                                 try {
-                                    // 🟡 Always get fresh spin data directly from Firebase
                                     const spinData = await getSpinData(fid);
 
-                                    if (!spinData) {
-                                        console.log("🆕 New user detected — creating spin data with 0 chances.");
-                                        const newData = {
-                                            dailyChancesLeft: 0,
-                                            lastResetTime: new Date().toISOString(),
-                                        };
-                                        await setSpinData(fid, newData.dailyChancesLeft, newData.lastResetTime);
-                                        iframeRef.current?.contentWindow?.postMessage(
-                                            {
-                                                type: "UNITY_METHOD_CALL",
-                                                method: "SetSpinData",
-                                                args: [
-                                                    String(newData.dailyChancesLeft),
-                                                    String(newData.lastResetTime),
-                                                ],
-                                            },
-                                            "*"
-                                        );
-                                        return;
-                                    }
-
-                                    // ✅ Sync latest values from Firebase to Unity
                                     const safeChances = Math.max(0, Number(spinData.dailyChancesLeft));
                                     const safeResetTime = spinData.lastResetTime ?? new Date().toISOString();
 
@@ -527,6 +504,7 @@ export default function FarcasterApp() {
                                 }
                                 break;
                             }
+
 
 
                         }
