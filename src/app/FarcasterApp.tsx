@@ -355,18 +355,22 @@ export default function FarcasterApp() {
                                 break;
                             }
 
-                            // 🎡 Spin system
                             case "save-spin-data": {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid || !actionData.data) return;
 
                                 try {
                                     const safeChances = Math.max(0, actionData.data.dailyChancesLeft ?? 0);
-                                    const safeReset = actionData.data.lastResetTime ?? new Date().toISOString();
+                                    const safeReset = actionData.data.lastResetTime; // ❌ no fallback new Date()
+
+                                    if (!safeReset) {
+                                        console.warn("⚠️ save-spin-data called without lastResetTime — skipping");
+                                        return;
+                                    }
 
                                     await setSpinData(fid, safeChances, safeReset);
 
-                                    console.log("💾 Updated Firebase spin data:", {
+                                    console.log("💾 Saved spin data (safe):", {
                                         fid,
                                         dailyChancesLeft: safeChances,
                                         lastResetTime: safeReset,
@@ -376,6 +380,7 @@ export default function FarcasterApp() {
                                 }
                                 break;
                             }
+
 
 
 
