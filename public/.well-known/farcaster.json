@@ -7,12 +7,12 @@
     "frame": {
         "version": "1",
         "name": "Flow",
-        "iconUrl": "https://flow.trenchverse.com/icon.png",
-        "homeUrl": "https://flow.trenchverse.com",
+        "iconUrl": "https://i.ibb.co/0pbQdrjq/Untitled-design-2025-11-11-T020819-399.png",
+        "homeUrl": "https://i.ibb.co/0pbQdrjq/Untitled-design-2025-11-11-T020819-399.png",
         "imageUrl": "https://flow.trenchverse.com/image.png",
         "buttonTitle": "Play Now",
-        "splashImageUrl": "https://flow.trenchverse.com/splash.png",
-        "splashBackgroundColor": "#eeccff",
+        "splashImageUrl": "https://i.ibb.co/0pbQdrjq/Untitled-design-2025-11-11-T020819-399.png",
+        "splashBackgroundColor": "#FFFFFF",
         "webhookUrl": "https://api.neynar.com/f/app/f8a87605-c797-468e-b218-3e568a323f38/event"
     }
 }
