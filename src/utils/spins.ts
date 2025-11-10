@@ -27,31 +27,34 @@ export async function getSpinData(fid: string) {
     };
 }
 
-/**
- * Only save spin data when it *actually changes*.
- */
-export async function setSpinData(
-    fid: string,
-    dailyChancesLeft: number,
-    lastResetTime: string
-) {
-    const userRef = ref(db, "users/" + fid + "/spin");
-    const snapshot = await get(userRef);
-    const prev = snapshot.exists() ? snapshot.val() : {};
 
-    // 🧠 Prevent overwriting lastResetTime unless spins reached 0 or reset
-    if (
-        prev.lastResetTime === lastResetTime &&
-        prev.dailyChancesLeft === dailyChancesLeft
+
+
+    export async function setSpinData(
+        fid: string,
+        dailyChancesLeft: number,
+        lastResetTime: string
     ) {
-        console.log("⚠️ Skipping redundant save — no change detected.");
-        return;
+        const userRef = ref(db, "users/" + fid + "/spin");
+        const snapshot = await get(userRef);
+        const prev = snapshot.exists() ? snapshot.val() : {};
+
+        // 🧠 Block if the new timestamp is newer by < 10 minutes (prevents reopen overwrite)
+        if (
+            prev.lastResetTime &&
+            new Date(lastResetTime).getTime() - new Date(prev.lastResetTime).getTime() < 10 * 60 * 1000 &&
+            dailyChancesLeft === prev.dailyChancesLeft
+        ) {
+            console.log("🚫 Firebase blocked redundant or premature update of lastResetTime.");
+            return;
+        }
+
+        await update(userRef, {
+            dailyChancesLeft: Math.max(0, dailyChancesLeft),
+            lastResetTime,
+        });
+
+        console.log(`💾 Firebase Saved spin data → ${fid} | spins=${dailyChancesLeft}, reset=${lastResetTime}`);
     }
 
-    await update(userRef, {
-        dailyChancesLeft: Math.max(0, dailyChancesLeft),
-        lastResetTime,
-    });
 
-    console.log(`💾 Saved spin data → ${fid} | spins=${dailyChancesLeft}, reset=${lastResetTime}`);
-}

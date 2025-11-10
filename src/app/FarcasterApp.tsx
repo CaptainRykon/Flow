@@ -359,27 +359,29 @@ export default function FarcasterApp() {
                                 const fid = userInfoRef.current.fid;
                                 if (!fid || !actionData.data) return;
 
+                                const { dailyChancesLeft, lastResetTime } = actionData.data;
+
+                                // ❌ Never auto-save when player has spins left
+                                if ((dailyChancesLeft ?? 0) >0) {
+                                    console.log("🚫 Skipped save-spin-data — player still has spins left.");
+                                    return;
+                                }
+
+                                // ❌ Must have valid time
+                                if (!lastResetTime) {
+                                    console.warn("⚠️ Missing lastResetTime, skipping save.");
+                                    return;
+                                }
+
                                 try {
-                                    const safeChances = Math.max(0, actionData.data.dailyChancesLeft ?? 0);
-                                    const safeReset = actionData.data.lastResetTime; // ❌ no fallback new Date()
-
-                                    if (!safeReset) {
-                                        console.warn("⚠️ save-spin-data called without lastResetTime — skipping");
-                                        return;
-                                    }
-
-                                    await setSpinData(fid, safeChances, safeReset);
-
-                                    console.log("💾 Saved spin data (safe):", {
-                                        fid,
-                                        dailyChancesLeft: safeChances,
-                                        lastResetTime: safeReset,
-                                    });
+                                    await setSpinData(fid, Math.max(0, dailyChancesLeft ?? 0), lastResetTime);
+                                    console.log("💾 Saved spin data safely:", { fid, dailyChancesLeft, lastResetTime });
                                 } catch (e) {
                                     console.error("❌ save-spin-data error:", e);
                                 }
                                 break;
                             }
+
 
 
 
