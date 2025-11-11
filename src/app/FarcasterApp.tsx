@@ -166,6 +166,9 @@ export default function FarcasterApp() {
 
 
 
+
+
+
                 // 📨 Global message handler (Unity → React)
                 window.addEventListener("message", async (event: MessageEvent) => {
                     const raw = event.data as unknown;
