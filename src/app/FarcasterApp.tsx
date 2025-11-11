@@ -172,6 +172,22 @@ export default function FarcasterApp() {
                     if (!raw || typeof raw !== "object") return;
                     const obj = raw as Record<string, unknown>;
 
+
+                    // inside your global message handler in React
+                    if (obj && (obj as any).type === "NAVIGATE_TO_MAIN") {
+                        const msg = obj as { type: string; url?: string };
+                        const url = msg.url ?? "/BridgeWebgl/index.html";
+                        console.log("➡️ Parent received NAVIGATE_TO_MAIN — navigating iframe to:", url);
+                        if (iframeRef.current) {
+                            // set src to main app
+                            iframeRef.current.setAttribute("src", url);
+                        }
+                        return;
+                    }
+
+
+
+
                     if (obj.type === "frame-action") {
                         const actionData = obj as FrameActionMessage;
 
