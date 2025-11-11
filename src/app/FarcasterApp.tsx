@@ -176,17 +176,17 @@ export default function FarcasterApp() {
                     const obj = raw as Record<string, unknown>;
 
 
-                    //// inside your global message handler in React
-                    //if (obj && typeof obj.type === "string" && obj.type === "NAVIGATE_TO_MAIN") {
-                    //    const msg = obj as { type: string; url?: string };
-                    //    const url = msg.url ?? "/BridgeWebgl/index.html";
-                    //    console.log("➡️ Parent received NAVIGATE_TO_MAIN — navigating iframe to:", url);
-                    //    if (iframeRef.current) {
-                    //        // set src to main app
-                    //        iframeRef.current.setAttribute("src", url);
-                    //    }
-                    //    return;
-                    //}
+                    // inside your global message handler in React
+                    if (obj && typeof obj.type === "string" && obj.type === "NAVIGATE_TO_MAIN") {
+                        const msg = obj as { type: string; url?: string };
+                        const url = msg.url ?? "/BridgeWebgl/index.html";
+                        console.log("➡️ Parent received NAVIGATE_TO_MAIN — navigating iframe to:", url);
+                        if (iframeRef.current) {
+                            // set src to main app
+                            iframeRef.current.setAttribute("src", url);
+                        }
+                        return;
+                    }
 
 
 
