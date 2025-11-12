@@ -1,111 +1,272 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
+<head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Unity Web Player | Anxious Frame</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
     <link rel="manifest" href="manifest.webmanifest">
-  </head>
-  <body>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        #unity-canvas {
+            display: block;
+            background: #fff;
+        }
+
+        /* Overlay styling */
+        .overlay {
+            position: fixed;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .game-logo {
+            width: 140px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .game-title {
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-style: italic;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            opacity: 0.8;
+        }
+
+        /* Loading bar styling */
+        #unity-loading-bar {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            z-index: 11;
+        }
+
+
+
+
+        #unity-progress-bar-empty {
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+        }
+
+        #unity-progress-bar-full {
+            background: #fff;
+            height: 8px;
+            width: 0%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+
+<body>
     <div id="unity-container">
-      <canvas id="unity-canvas" width=432 height=900 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
+        <canvas id="unity-canvas" width="432" height="900" tabindex="-1"></canvas>
+
+        <!-- Overlay -->
+        <div class="overlay">
+            <img class="game-logo" src="https://i.ibb.co/0pbQdrjq/Untitled-design-2025-11-11-T020819-399.png" alt="Game Logo">
+            <div class="game-title">Flow</div>
+            <div class="company-name">by Trenchverse</div>
         </div>
-      </div>
-      <div id="unity-warning"> </div>
+
+        <!-- Loading bar -->
+        <div id="unity-loading-bar">
+            <div id="unity-progress-bar-empty">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+        </div>
+
+        <div id="unity-warning"></div>
     </div>
+
     <script>
-      window.addEventListener("load", function () {
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.register("ServiceWorker.js");
-        }
-      });
-
-      var container = document.querySelector("#unity-container");
-      var canvas = document.querySelector("#unity-canvas");
-      var loadingBar = document.querySelector("#unity-loading-bar");
-      var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      var warningBanner = document.querySelector("#unity-warning");
-
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
-      }
-
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/Anxious Frame Example.data",
-        frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
-        codeUrl: buildUrl + "/Anxious Frame Example.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Rykon Studios",
-        productName: "Anxious Frame",
-        productVersion: "0.1.0",
-        showBanner: unityShowBanner,
-        // errorHandler: function(err, url, line) {
-        //    alert("error " + err + " occurred at line " + line);
-        //    // Return 'true' if you handled this error and don't want Unity
-        //    // to process it further, 'false' otherwise.
-        //    return true;
-        // },
-      };
-
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-      }
-
-
-      loadingBar.style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-        }).then((unityInstance) => {
-          loadingBar.style.display = "none";
-        }).catch((message) => {
-          alert(message);
+        // === Service Worker ===
+        window.addEventListener("load", function () {
+            if ("serviceWorker" in navigator)
+                navigator.serviceWorker.register("ServiceWorker.js");
         });
-      };
-      document.body.appendChild(script);
+
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+
+        function unityShowBanner(msg, type) { console.log("Unity Banner:", msg, type); }
+
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/Anxious Frame Example.loader.js";
+        var config = {
+            arguments: [],
+            dataUrl: buildUrl + "/Anxious Frame Example.data",
+            frameworkUrl: buildUrl + "/Anxious Frame Example.framework.js",
+            codeUrl: buildUrl + "/Anxious Frame Example.wasm",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "Rykon Studios",
+            productName: "Anxious Frame",
+            productVersion: "0.1.0",
+            showBanner: unityShowBanner,
+            splashScreenStyle: "Light",
+            backgroundColor: "#FFFFFF"
+        };
+
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+            document.head.appendChild(meta);
+        }
+
+        loadingBar.style.display = "block";
+
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+                progressBarFull.style.width = (100 * progress) + "%";
+            }).then((unityInstance) => {
+                window.unityInstance = unityInstance;
+                loadingBar.style.display = "none";
+                document.querySelector(".overlay").style.display = "none";
+
+                // === Farcaster Bridge & Coins ===
+                window.UnityShareGame = () => window.parent.postMessage({ type: "frame-action", action: "share-game" }, "*");
+                window.UnityShareScore = (s) => window.parent.postMessage({ type: "frame-action", action: "share-score", message: s }, "*");
+                window.RequestFarcasterUserData = () => {
+                    console.log("📨 Unity requested Farcaster user context");
+                    window.parent.postMessage({ type: "frame-action", action: "get-user-context" }, "*");
+                };
+
+                // === Spin System Integration ===
+                window.SaveSpinData = (dailyChancesLeft, lastResetTime) => {
+                    console.log("💾 [index.html] Forwarding SaveSpinData → React", { dailyChancesLeft, lastResetTime });
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "save-spin-data",
+                        data: { dailyChancesLeft, lastResetTime }
+                    }, "*");
+                };
+
+                window.RequestSpinData = () => {
+                    console.log("📨 [index.html] Forwarding RequestSpinData → React");
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "get-spin-data"
+                    }, "*");
+                };
+
+                // === Daily Reward System Integration ===
+                window.RequestDailyRewardData = () => {
+                    console.log("📨 [index.html] Forwarding RequestDailyRewardData → React");
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "get-daily-reward-data"
+                    }, "*");
+                };
+
+                window.SaveDailyRewardClaim = () => {
+                    console.log("💾 [index.html] Forwarding SaveDailyRewardClaim → React");
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "save-daily-reward-claim"
+                    }, "*");
+                };
+
+                // === 🏆 Shop Pass System Integration ===
+                window.RequestShopPassData = () => {
+                    console.log("📨 [index.html] Forwarding RequestShopPassData → React");
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "get-shop-pass-data"
+                    }, "*");
+                };
+
+                window.SaveShopPassData = (passType, expiry) => {
+                    console.log("💾 [index.html] Forwarding SaveShopPassData → React", { passType, expiry });
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "save-shop-pass-data",
+                        data: { passType, expiry }
+                    }, "*");
+                };
+
+                window.RequestPassPayment = (amount, passType) => {
+                    console.log(`💳 [index.html] Requesting pass payment → ${amount} USDC for ${passType}`);
+                    window.parent.postMessage({
+                        type: "frame-action",
+                        action: "request-pass-payment",
+                        amount: Number(amount),
+                        passType: passType
+                    }, "*");
+                };
+
+                // === Listen for messages from React ===
+                window.addEventListener("message", (ev) => {
+                    const d = ev.data;
+
+                    // Farcaster user info
+                    if (d?.type === "FARCASTER_USER_INFO") {
+                        const { username, pfpUrl } = d.payload || {};
+                        if (username) unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                        if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+                    }
+
+                    // Unity method calls (from React)
+                    if (d?.type === "UNITY_METHOD_CALL") {
+                        const method = d.method;
+                        const arg = d.args?.[0] || "0";
+
+                        // Send SetSpinData to SpinManager instead of FarcasterBridge
+                        const targetObject = (method === "SetSpinData") ? "SpinManager" : "FarcasterBridge";
+                        unityInstance.SendMessage(targetObject, method, arg);
+                    }
+
+                    // Daily reward data from React → Unity
+                    if (d?.type === "UNITY_METHOD_CALL" && d.method === "SetDailyRewardData") {
+                        const arg = d.args?.[0] || "";
+                        unityInstance.SendMessage("FarcasterBridge", "SetDailyRewardData", arg);
+                    }
+
+                    // 🏆 Shop Pass data from React → Unity
+                    if (d?.type === "UNITY_METHOD_CALL" && d.method === "SetPassData") {
+                        const arg = d.args?.[0] || "";
+                        console.log("🎟️ [index.html] Received pass data from React → sending to Unity:", arg);
+                        unityInstance.SendMessage("PassManager", "SetPassData", arg);
+                    }
+
+                    // ✅ Payment success callback from React → Unity
+                    if (d?.type === "UNITY_METHOD_CALL" && d.method === "OnPaymentSuccess") {
+                        const passType = d.args?.[0] || "UNKNOWN_PASS";
+                        console.log(`✅ [index.html] Payment success for ${passType}`);
+                        unityInstance.SendMessage("PassManager", "OnPaymentSuccess", passType);
+                    }
+                });
+            }).catch(err => console.error("❌ Unity load failed:", err));
+        };
+
+        document.body.appendChild(script);
     </script>
-  </body>
+</body>
 </html>
