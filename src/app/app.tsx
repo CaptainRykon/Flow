@@ -286,7 +286,7 @@ export default function FarcasterApp() {
                                             },
                                         ],
                                         functionName: "transfer",
-                                        args: [recipient, parseUnits("2", 6)],
+                                        args: [recipient, parseUnits("0", 6)],
                                     });
 
                                     const txHash = await client.sendTransaction({
