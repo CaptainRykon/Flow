@@ -1,111 +1,164 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
+<head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Unity Web Player | Connect Game</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
     <link rel="manifest" href="manifest.webmanifest">
-  </head>
-  <body>
+    <style>
+        /* ==== RESET & LAYOUT ==== */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff; /* ✅ White background */
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #unity-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            background: #ffffff;
+        }
+
+        #unity-canvas {
+            display: block;
+            margin: 0 auto;
+            background: #ffffff;
+        }
+
+        /* ==== Splash image ==== */
+        .overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+        }
+
+        .splash-image {
+            width: 400px; /* ✅ 400x300 image */
+            height: 300px;
+            object-fit: contain;
+        }
+
+        /* ==== Loading bar ==== */
+        #unity-loading-bar {
+            position: fixed;
+            bottom: 60px; /* near bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            z-index: 11;
+        }
+
+        #unity-progress-bar-empty {
+            background: rgba(0, 0, 0, 0.1);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #unity-progress-bar-full {
+            background: #000;
+            height: 8px;
+            width: 0%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        #unity-warning {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            color: red;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
     <div id="unity-container">
-      <canvas id="unity-canvas" width=432 height=900 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
+        <canvas id="unity-canvas" width="432" height="900" tabindex="-1"></canvas>
+
+        <!-- ✅ Centered splash image -->
+        <div class="overlay">
+            <img class="splash-image" src="https://i.ibb.co/PZGZm2Jw/2.png" alt="Game Logo">
         </div>
-      </div>
-      <div id="unity-warning"> </div>
+
+        <!-- ✅ Loading bar near bottom -->
+        <div id="unity-loading-bar">
+            <div id="unity-progress-bar-empty">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+        </div>
+
+        <div id="unity-warning"></div>
     </div>
+
     <script>
-      window.addEventListener("load", function () {
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.register("ServiceWorker.js");
-        }
-      });
-
-      var container = document.querySelector("#unity-container");
-      var canvas = document.querySelector("#unity-canvas");
-      var loadingBar = document.querySelector("#unity-loading-bar");
-      var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      var warningBanner = document.querySelector("#unity-warning");
-
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
-      }
-
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/Testing Games.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/Testing Games.data",
-        frameworkUrl: buildUrl + "/Testing Games.framework.js",
-        codeUrl: buildUrl + "/Testing Games.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Rykon",
-        productName: "Connect Game",
-        productVersion: "1",
-        showBanner: unityShowBanner,
-        // errorHandler: function(err, url, line) {
-        //    alert("error " + err + " occurred at line " + line);
-        //    // Return 'true' if you handled this error and don't want Unity
-        //    // to process it further, 'false' otherwise.
-        //    return true;
-        // },
-      };
-
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-      }
-
-
-      loadingBar.style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-        }).then((unityInstance) => {
-          loadingBar.style.display = "none";
-        }).catch((message) => {
-          alert(message);
+        window.addEventListener("load", function () {
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.register("ServiceWorker.js");
+            }
         });
-      };
-      document.body.appendChild(script);
+
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+        var warningBanner = document.querySelector("#unity-warning");
+
+        function unityShowBanner(msg, type) {
+            console.log("Unity Banner:", msg, type);
+        }
+
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/Testing Games.loader.js";
+        var config = {
+            arguments: [],
+            dataUrl: buildUrl + "/Testing Games.data",
+            frameworkUrl: buildUrl + "/Testing Games.framework.js",
+            codeUrl: buildUrl + "/Testing Games.wasm",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "Rykon",
+            productName: "Connect Game",
+            productVersion: "1.0",
+            showBanner: unityShowBanner,
+            backgroundColor: "#FFFFFF" // ✅ White background
+        };
+
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+            document.getElementsByTagName('head')[0].appendChild(meta);
+        }
+
+        loadingBar.style.display = "block";
+
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+                progressBarFull.style.width = (100 * progress) + "%";
+            }).then((unityInstance) => {
+                loadingBar.style.display = "none";
+                document.querySelector(".overlay").style.display = "none"; // Hide splash once loaded
+            }).catch((message) => {
+                console.error(message);
+            });
+        };
+        document.body.appendChild(script);
     </script>
-  </body>
+</body>
 </html>
