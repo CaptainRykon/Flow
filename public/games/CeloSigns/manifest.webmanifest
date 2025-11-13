@@ -1,0 +1,15 @@
+{
+    "name": "Testing game 2D Core",
+    "short_name": "Testing game 2D Core",
+    "start_url": "index.html",
+    "display": "fullscreen",
+    "background_color": "#7FE2FC",
+    "theme_color": "#fff",
+    "description": "",
+    "icons": [{
+      "src": "TemplateData/icons/unity-logo-light.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }]
+  }
