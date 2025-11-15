@@ -71,7 +71,7 @@ import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 import { getSpinData, setSpinData } from "@/utils/spins";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
-import { switchChain } from "wagmi/actions";
+//import { switchChain } from "wagmi/actions";
 
 
 type FarcasterUserInfo = {
@@ -292,12 +292,20 @@ export default function FarcasterApp() {
                                     const chainId = CHAIN_ID[chain];
                                     const usdcAddress = USDC[chain];
 
-                                    console.log("⭐ Paying on:", chain, chainId, usdcAddress);
+                                    console.log("⭐ Payment requested on:", chain, "→ expecting chainId:", chainId);
 
-                                    // ⭐ NEW CORRECT WAY (works everywhere)
+                                    // ❗BLOCK IF WALLET IS ON WRONG CHAIN (no switching allowed)
                                     if (client.chain.id !== chainId) {
-                                        console.log("⛓ Switching chain using wagmi switchChain →", chainId);
-                                        await switchChain(config, { chainId });
+                                        console.error(
+                                            `❌ Wrong chain! Wallet is on ${client.chain.id}, but Unity wants ${chainId}`
+                                        );
+
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            { type: "UNITY_METHOD_CALL", method: "OnWrongChain", args: [String(client.chain.id)] },
+                                            "*"
+                                        );
+
+                                        return;
                                     }
 
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
@@ -330,9 +338,10 @@ export default function FarcasterApp() {
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
                                         "*"
                                     );
-
-                                } catch (err) {
+                                }
+                                catch (err) {
                                     console.error("❌ Payment failed:", err);
+
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["0"] },
                                         "*"
@@ -341,6 +350,7 @@ export default function FarcasterApp() {
 
                                 break;
                             }
+
 
 
 
