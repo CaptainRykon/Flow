@@ -71,6 +71,8 @@ import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 import { getSpinData, setSpinData } from "@/utils/spins";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
+import { switchChain } from "wagmi/actions";
+
 
 type FarcasterUserInfo = {
     username: string;
@@ -287,15 +289,15 @@ export default function FarcasterApp() {
                                         celo: 42220,
                                     } as const;
 
-                                    const usdcAddress = USDC[chain];
                                     const chainId = CHAIN_ID[chain];
+                                    const usdcAddress = USDC[chain];
 
-                                    console.log("⭐ Payment on:", chain, usdcAddress, chainId);
+                                    console.log("⭐ Paying on:", chain, chainId, usdcAddress);
 
-                                    // chain mismatch → switch
+                                    // ⭐ NEW CORRECT WAY (works everywhere)
                                     if (client.chain.id !== chainId) {
-                                        console.log("⛓ Switching chain →", chain);
-                                        await client.switchChain({ id: chainId });
+                                        console.log("⛓ Switching chain using wagmi switchChain →", chainId);
+                                        await switchChain(config, { chainId });
                                     }
 
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
@@ -339,6 +341,8 @@ export default function FarcasterApp() {
 
                                 break;
                             }
+
+
 
 
 
