@@ -109,6 +109,9 @@ type FrameActionMessage = {
     passType?: string;
     expiry?: string;
 
+    // ⭐ Add this
+    chain?: "base" | "arbitrum" | "celo";
+
 
     // 🔹 Flexible data payload for spin, reward, and pass info
     data?: {
@@ -257,11 +260,12 @@ export default function FarcasterApp() {
                                 postToUnity();
                                 break;
 
-                            case "request-payment":
+                            case "request-payment": {
                                 if (!isConnected) {
                                     console.warn("❌ Wallet not connected.");
                                     return;
                                 }
+
                                 try {
                                     const client = await getWalletClient(config);
                                     if (!client) {
@@ -269,41 +273,74 @@ export default function FarcasterApp() {
                                         return;
                                     }
 
+                                    const chain = (actionData.chain ?? "base") as "base" | "arbitrum" | "celo";
+
+                                    const USDC = {
+                                        base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                                        arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                                        celo: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+                                    } as const;
+
+                                    const CHAIN_ID = {
+                                        base: 8453,
+                                        arbitrum: 42161,
+                                        celo: 42220,
+                                    } as const;
+
+                                    const usdcAddress = USDC[chain];
+                                    const chainId = CHAIN_ID[chain];
+
+                                    console.log("⭐ Payment on:", chain, usdcAddress, chainId);
+
+                                    // chain mismatch → switch
+                                    if (client.chain.id !== chainId) {
+                                        console.log("⛓ Switching chain →", chain);
+                                        await client.switchChain({ id: chainId });
+                                    }
+
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+                                    const amount = actionData.amount ?? 0;
 
                                     const txData = encodeFunctionData({
-                                        abi: [
-                                            {
-                                                name: "transfer",
-                                                type: "function",
-                                                stateMutability: "nonpayable",
-                                                inputs: [
-                                                    { name: "to", type: "address" },
-                                                    { name: "amount", type: "uint256" },
-                                                ],
-                                                outputs: [{ name: "", type: "bool" }],
-                                            },
-                                        ],
+                                        abi: [{
+                                            name: "transfer",
+                                            type: "function",
+                                            inputs: [
+                                                { name: "to", type: "address" },
+                                                { name: "amount", type: "uint256" },
+                                            ],
+                                            outputs: [{ name: "", type: "bool" }],
+                                            stateMutability: "nonpayable",
+                                        }],
                                         functionName: "transfer",
-                                        args: [recipient, parseUnits("0", 6)],
+                                        args: [recipient, parseUnits(String(amount), 6)],
                                     });
 
                                     const txHash = await client.sendTransaction({
-                                        to: usdcContract,
+                                        to: usdcAddress,
                                         data: txData,
                                         value: 0n,
                                     });
 
-                                    console.log("✅ Transaction sent:", txHash);
+                                    console.log("✅ Payment sent:", txHash);
+
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
                                         "*"
                                     );
+
                                 } catch (err) {
                                     console.error("❌ Payment failed:", err);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["0"] },
+                                        "*"
+                                    );
                                 }
+
                                 break;
+                            }
+
+
 
                             case "share-game":
                                 sdk.actions.openUrl(
