@@ -74,6 +74,9 @@ import { getPassData, savePassData } from "@/utils/passes";
 //import { switchChain } from "wagmi/actions";
 
 
+
+
+
 type FarcasterUserInfo = {
     username: string;
     pfpUrl: string;
@@ -144,11 +147,14 @@ function isOpenUrlMessage(msg: unknown): msg is { action: "open-url"; url: strin
 }
 
 export default function FarcasterApp() {
+
+ 
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const userInfoRef = useRef<FarcasterUserInfo>({ username: "Guest", pfpUrl: "", fid: "" });
 
     const { address, isConnected } = useAccount();
     const config = useConfig();
+
 
     // 🪙 Allow external scripts to send coins directly to Unity
     useEffect(() => {
@@ -262,26 +268,20 @@ export default function FarcasterApp() {
                                 postToUnity();
                                 break;
 
-                            case "request-payment": {
-                                if (!isConnected) {
-                                    console.warn("❌ Wallet not connected.");
-                                    return;
-                                }
 
+
+
+
+                            case "request-payment": {
                                 try {
-                                    const client = await getWalletClient(config);
-                                    if (!client) {
-                                        console.error("❌ Wallet client not available");
+                                    const provider = sdk.wallet.ethProvider;   // ✅ Correct wallet provider
+
+                                    if (!provider) {
+                                        console.error("❌ No wallet provider available in Farcaster");
                                         return;
                                     }
 
                                     const chain = (actionData.chain ?? "base") as "base" | "arbitrum" | "celo";
-
-                                    const USDC = {
-                                        base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                                        arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-                                        celo: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
-                                    } as const;
 
                                     const CHAIN_ID = {
                                         base: 8453,
@@ -289,50 +289,59 @@ export default function FarcasterApp() {
                                         celo: 42220,
                                     } as const;
 
+                                    const USDC = {
+                                        base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                                        arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                                        celo: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+                                    } as const;
+
                                     const chainId = CHAIN_ID[chain];
                                     const usdcAddress = USDC[chain];
-
-                                    console.log("⭐ Payment requested on:", chain, "→ expecting chainId:", chainId);
-
-                                    // ❗BLOCK IF WALLET IS ON WRONG CHAIN (no switching allowed)
-                                    if (client.chain.id !== chainId) {
-                                        console.error(
-                                            `❌ Wrong chain! Wallet is on ${client.chain.id}, but Unity wants ${chainId}`
-                                        );
-
-                                        iframeRef.current?.contentWindow?.postMessage(
-                                            { type: "UNITY_METHOD_CALL", method: "OnWrongChain", args: [String(client.chain.id)] },
-                                            "*"
-                                        );
-
-                                        return;
-                                    }
-
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const amount = actionData.amount ?? 0;
 
-                                    const txData = encodeFunctionData({
-                                        abi: [{
-                                            name: "transfer",
-                                            type: "function",
-                                            inputs: [
-                                                { name: "to", type: "address" },
-                                                { name: "amount", type: "uint256" },
-                                            ],
-                                            outputs: [{ name: "", type: "bool" }],
-                                            stateMutability: "nonpayable",
-                                        }],
-                                        functionName: "transfer",
-                                        args: [recipient, parseUnits(String(amount), 6)],
+                                    const amount = parseUnits(String(actionData.amount ?? 0), 6);
+
+                                    console.log("🌐 Switching chain to:", chain, chainId);
+
+                                    // 1️⃣ Switch chain (Farcaster wallet)
+                                    // ❌ REMOVE params: []
+                                    await provider.request({
+                                        method: "wallet_switchEthereumChain",
+                                        params: [{ chainId: "0x" + chainId.toString(16) }],
                                     });
 
-                                    const txHash = await client.sendTransaction({
-                                        to: usdcAddress,
-                                        data: txData,
-                                        value: 0n,
+                                    // ❌ REMOVE params: []
+                                    const accounts = await provider.request({
+                                        method: "eth_accounts"
                                     });
 
-                                    console.log("✅ Payment sent:", txHash);
+                                    const from = accounts[0];
+
+                                    // 3️⃣ Send USDC using ERC20 transfer
+                                    console.log("💸 Sending USDC on chain:", chain);
+
+                                    await provider.request({
+                                        method: "eth_sendTransaction",
+                                        params: [{
+                                            from,
+                                            to: usdcAddress,
+                                            value: "0x0",
+                                            data: encodeFunctionData({
+                                                abi: [{
+                                                    name: "transfer",
+                                                    type: "function",
+                                                    inputs: [
+                                                        { name: "to", type: "address" },
+                                                        { name: "amount", type: "uint256" },
+                                                    ]
+                                                }],
+                                                functionName: "transfer",
+                                                args: [recipient, amount]
+                                            })
+                                        }]
+                                    });
+
+                                    console.log("✅ Payment success", chain);
 
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
@@ -347,9 +356,13 @@ export default function FarcasterApp() {
                                         "*"
                                     );
                                 }
-
                                 break;
                             }
+
+
+
+
+
 
 
 
