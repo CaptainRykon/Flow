@@ -160,6 +160,13 @@
         window.addEventListener("message", (event) => {
             const data = event.data;
 
+            // Farcaster user info
+            if (d?.type === "FARCASTER_USER_INFO") {
+                const { username, pfpUrl } = d.payload || {};
+                if (username) unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+            }
+
             if (!data || typeof data !== "object") return;
 
             // Check for method call from React
