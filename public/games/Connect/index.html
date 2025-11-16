@@ -39,7 +39,7 @@
             top: 20%;
             left: 50%;
             transform: translateX(-50%);
-            width = 60%;
+            width: 60%;
             z-index: 10;
         }
 
@@ -160,11 +160,16 @@
         window.addEventListener("message", (event) => {
             const data = event.data;
 
-            // Farcaster user info
             if (d?.type === "FARCASTER_USER_INFO") {
                 const { username, pfpUrl } = d.payload || {};
-                if (username) unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
-                if (pfpUrl) unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+                if (username) {
+                    instance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+                    console.log("👤 Username → Unity:", username);
+                }
+                if (pfpUrl) {
+                    instance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+                    console.log("🖼️ PFP URL → Unity:", pfpUrl);
+                }
             }
 
             if (!data || typeof data !== "object") return;
