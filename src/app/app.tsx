@@ -274,10 +274,10 @@ export default function FarcasterApp() {
 
                             case "request-payment": {
                                 try {
-                                    const provider = sdk.wallet.ethProvider;   // ✅ Correct wallet provider
+                                    const provider = sdk.wallet.ethProvider;
 
                                     if (!provider) {
-                                        console.error("❌ No wallet provider available in Farcaster");
+                                        console.error("❌ No Ethereum provider available in Farcaster.");
                                         return;
                                     }
 
@@ -301,24 +301,17 @@ export default function FarcasterApp() {
 
                                     const amount = parseUnits(String(actionData.amount ?? 0), 6);
 
-                                    console.log("🌐 Switching chain to:", chain, chainId);
+                                    console.log("🌐 Switching chain:", chain);
 
-                                    // 1️⃣ Switch chain (Farcaster wallet)
-                                    // ❌ REMOVE params: []
                                     await provider.request({
                                         method: "wallet_switchEthereumChain",
                                         params: [{ chainId: "0x" + chainId.toString(16) }],
                                     });
 
-                                    // ❌ REMOVE params: []
-                                    const accounts = await provider.request({
-                                        method: "eth_accounts"
-                                    });
-
+                                    const accounts = await provider.request({ method: "eth_accounts" });
                                     const from = accounts[0];
 
-                                    // 3️⃣ Send USDC using ERC20 transfer
-                                    console.log("💸 Sending USDC on chain:", chain);
+                                    console.log("💸 Sending USDC:", from);
 
                                     await provider.request({
                                         method: "eth_sendTransaction",
@@ -336,19 +329,19 @@ export default function FarcasterApp() {
                                                     ]
                                                 }],
                                                 functionName: "transfer",
-                                                args: [recipient, amount]
-                                            })
-                                        }]
+                                                args: [recipient, amount],
+                                            }),
+                                        }],
                                     });
 
-                                    console.log("✅ Payment success", chain);
+                                    console.log("✅ Payment Success");
 
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
                                         "*"
                                     );
-                                }
-                                catch (err) {
+
+                                } catch (err) {
                                     console.error("❌ Payment failed:", err);
 
                                     iframeRef.current?.contentWindow?.postMessage(
@@ -356,8 +349,10 @@ export default function FarcasterApp() {
                                         "*"
                                     );
                                 }
+
                                 break;
                             }
+
 
 
 
