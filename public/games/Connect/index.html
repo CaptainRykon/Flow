@@ -39,7 +39,7 @@
             top: 20%;
             left: 50%;
             transform: translateX(-50%);
-            width: 60%;
+            width= 60%;
             z-index: 10;
         }
 
@@ -160,19 +160,25 @@
         window.addEventListener("message", (event) => {
             const data = event.data;
 
-            if (d?.type === "FARCASTER_USER_INFO") {
-                const { username, pfpUrl } = d.payload || {};
-                if (username) {
-                    instance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
-                    console.log("👤 Username → Unity:", username);
-                }
-                if (pfpUrl) {
-                    instance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
-                    console.log("🖼️ PFP URL → Unity:", pfpUrl);
-                }
-            }
+         
 
             if (!data || typeof data !== "object") return;
+
+
+            if (data.type === "FARCASTER_USER_INFO") {
+                const { username, pfpUrl } = data.payload || {};
+
+                console.log("👤 Received username:", username);
+
+                if (username && unityInstance)
+                    unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+
+                if (pfpUrl && unityInstance)
+                    unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+
+                return;
+            }
+
 
             // Check for method call from React
             if (data.type === "UNITY_METHOD_CALL") {
