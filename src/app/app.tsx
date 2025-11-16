@@ -334,7 +334,7 @@ export default function FarcasterApp() {
                                         }],
                                     });
 
-                                    console.log("✅ Payment Success");
+                                    console.log("✅ Payment Success",chain);
 
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
