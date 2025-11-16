@@ -204,15 +204,19 @@
                     }, "*");
                 };
 
-                window.RequestPassPayment = (amount, passType) => {
-                    console.log(`💳 [index.html] Requesting pass payment → ${amount} USDC for ${passType}`);
+                // Add chain parameter ↓↓↓
+                window.RequestPassPayment = (amount, passType, chain) => {
+                    console.log(`💳 [index.html] Requesting pass payment → ${amount} USDC for ${passType} on ${chain}`);
+
                     window.parent.postMessage({
                         type: "frame-action",
                         action: "request-pass-payment",
                         amount: Number(amount),
-                        passType: passType
+                        passType: passType,
+                        chain: chain   // send chain to React
                     }, "*");
                 };
+
 
                 // === Listen for messages from React ===
                 window.addEventListener("message", (ev) => {

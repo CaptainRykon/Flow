@@ -557,63 +557,119 @@ export default function FarcasterApp() {
                                 break;
                             }
 
-                            // 💳 Handle pass payments
+                            
                             case "request-pass-payment": {
-                                if (!isConnected) {
-                                    console.warn("❌ Wallet not connected.");
-                                    return;
-                                }
                                 try {
-                                    const client = await getWalletClient(config);
-                                    if (!client) {
-                                        console.error("❌ Wallet client not available");
-                                        return;
-                                    }
+                                    // prefer Farcaster wallet provider
+                                    const provider = sdk?.wallet?.ethProvider ?? null;
 
+                                    const chain = (actionData.chain ?? "base") as "base" | "arbitrum" | "celo";
+                                    const CHAIN_ID = { base: 8453, arbitrum: 42161, celo: 42220 } as const;
+                                    const USDC = {
+                                        base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                                        arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+                                        celo: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+                                    } as const;
+
+                                    const chainId = CHAIN_ID[chain];
+                                    const usdcAddress = USDC[chain];
                                     const recipient = "0xE51f63637c549244d0A8E11ac7E6C86a1E9E0670";
-                                    const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+                                    const passType = actionData.passType ?? "UNKNOWN_PASS";
+                                    const amount = parseUnits(String(actionData.amount ?? 0), 6);
 
-                                    const amountNum: number = actionData.amount ?? 0;
-                                    const amountStr: string = amountNum.toString();
-                                    const passType: string = actionData.passType ?? "UNKNOWN_PASS";
+                                    console.log("🔗 request-pass-payment →", { passType, amount: String(actionData.amount), chain });
 
-                                    const txData = encodeFunctionData({
-                                        abi: [
-                                            {
-                                                name: "transfer",
-                                                type: "function",
-                                                stateMutability: "nonpayable",
-                                                inputs: [
-                                                    { name: "to", type: "address" },
-                                                    { name: "amount", type: "uint256" },
-                                                ],
-                                                outputs: [{ name: "", type: "bool" }],
-                                            },
-                                        ],
-                                        functionName: "transfer",
-                                        args: [recipient, parseUnits(amountStr, 6)],
-                                    });
+                                    if (provider) {
+                                        // switch chain
+                                        await provider.request({
+                                            method: "wallet_switchEthereumChain",
+                                            params: [{ chainId: "0x" + chainId.toString(16) }],
+                                        });
 
-                                    const txHash = await client.sendTransaction({
-                                        to: usdcContract,
-                                        data: txData,
-                                        value: 0n,
-                                    });
+                                        const accounts = await provider.request({ method: "eth_accounts" });
+                                        const from = accounts[0];
 
-                                    console.log(`✅ ${passType} payment complete → TX:`, txHash);
+                                        await provider.request({
+                                            method: "eth_sendTransaction",
+                                            params: [{
+                                                from,
+                                                to: usdcAddress,
+                                                value: "0x0",
+                                                data: encodeFunctionData({
+                                                    abi: [{
+                                                        name: "transfer",
+                                                        type: "function",
+                                                        inputs: [
+                                                            { name: "to", type: "address" },
+                                                            { name: "amount", type: "uint256" },
+                                                        ],
+                                                    }],
+                                                    functionName: "transfer",
+                                                    args: [recipient, amount],
+                                                }),
+                                            }],
+                                        });
 
-                                    iframeRef.current?.contentWindow?.postMessage({
-                                        type: "UNITY_METHOD_CALL",
-                                        method: "OnPaymentSuccess",
-                                        args: [passType],
-                                    }, "*");
+                                        console.log("✅ pass payment success (provider)", passType, chain);
 
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            { type: "UNITY_METHOD_CALL", method: "OnPaymentSuccess", args: [passType] },
+                                            "*"
+                                        );
+                                    } else {
+                                        // fallback to connected wallet client (wagmi getWalletClient) — you had this code previously
+                                        if (!isConnected) {
+                                            console.warn("❌ No wallet available to pay with");
+                                            iframeRef.current?.contentWindow?.postMessage(
+                                                { type: "UNITY_METHOD_CALL", method: "OnPaymentFailed", args: ["NO_WALLET"] },
+                                                "*"
+                                            );
+                                            return;
+                                        }
+
+                                        const client = await getWalletClient(config);
+                                        if (!client) {
+                                            throw new Error("Wallet client unavailable");
+                                        }
+
+                                        const txData = encodeFunctionData({
+                                            abi: [
+                                                {
+                                                    name: "transfer",
+                                                    type: "function",
+                                                    stateMutability: "nonpayable",
+                                                    inputs: [
+                                                        { name: "to", type: "address" },
+                                                        { name: "amount", type: "uint256" },
+                                                    ],
+                                                    outputs: [{ name: "", type: "bool" }],
+                                                },
+                                            ],
+                                            functionName: "transfer",
+                                            args: [recipient, amount],
+                                        });
+
+                                        const txHash = await client.sendTransaction({
+                                            to: usdcAddress,
+                                            data: txData,
+                                            value: 0n,
+                                        });
+
+                                        console.log("✅ pass payment success (client)", passType, txHash);
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            { type: "UNITY_METHOD_CALL", method: "OnPaymentSuccess", args: [passType] },
+                                            "*"
+                                        );
+                                    }
                                 } catch (err) {
-                                    console.error("❌ request-pass-payment error:", err);
+                                    console.error("❌ request-pass-payment failed:", err);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        { type: "UNITY_METHOD_CALL", method: "OnPaymentFailed", args: [String((err as Error)?.message ?? String(err))] },
+                                        "*"
+                                    );
                                 }
                                 break;
                             }
-
 
 
 
