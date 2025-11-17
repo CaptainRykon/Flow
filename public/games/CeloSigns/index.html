@@ -140,6 +140,7 @@
             createUnityInstance(canvas, config, (progress) => {
                 progressBarFull.style.width = (100 * progress) + "%";
             }).then((unityInstance) => {
+                window.unityInstance = unityInstance;
                 loadingBar.style.display = "none";
                 document.querySelector(".overlay").style.display = "none"; // Hide splash once loaded
             }).catch((message) => {
