@@ -48,7 +48,7 @@
             object-fit: contain;
         }
 
-
+      
 
         #unity-progress-bar-empty {
             background: rgba(0, 0, 0, 0.1);
@@ -101,12 +101,12 @@
             }
         });
 
+
+
         var canvas = document.querySelector("#unity-canvas");
         var loadingBar = document.querySelector("#unity-loading-bar");
         var progressBarFull = document.querySelector("#unity-progress-bar-full");
         var warningBanner = document.querySelector("#unity-warning");
-
-        let unityInstance = null;
 
         function unityShowBanner(msg, type) {
             console.log("Unity Banner:", msg, type);
@@ -124,14 +124,30 @@
             productName: "Connect Game",
             productVersion: "1.0",
             showBanner: unityShowBanner,
-            backgroundColor: "#063395"
+            backgroundColor: "#fcfe53" // ✅ White background
         };
+
+
+        function RequestPayment(amountPtr, chainPtr) {
+            var amount = UTF8ToString(amountPtr);
+            var chain = UTF8ToString(chainPtr);
+
+            console.log("💳 JS RequestPayment called:", amount, chain);
+
+            // Forward to React
+            window.parent.postMessage({
+                type: "frame-action",
+                action: "request-payment",
+                amount: Number(amount),
+                chain: chain
+            }, "*");
+        }
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             var meta = document.createElement('meta');
             meta.name = 'viewport';
             meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-            document.head.appendChild(meta);
+            document.getElementsByTagName('head')[0].appendChild(meta);
         }
 
         loadingBar.style.display = "block";
@@ -141,12 +157,10 @@
         script.onload = () => {
             createUnityInstance(canvas, config, (progress) => {
                 progressBarFull.style.width = (100 * progress) + "%";
-            }).then((instance) => {
-                unityInstance = instance;
+            }).then((unityInstance) => {
+                window.unityInstance = unityInstance;
                 loadingBar.style.display = "none";
-                document.querySelector(".overlay").style.display = "none";
-
-                console.log("✅ Unity Loaded");
+                document.querySelector(".overlay").style.display = "none"; // Hide splash once loaded
             }).catch((message) => {
                 console.error(message);
             });
@@ -154,8 +168,8 @@
         document.body.appendChild(script);
 
         /* ============================================================
-           ⭐ LISTEN FOR REACT → UNITY PAYMENT EVENTS
-           ============================================================ */
+   ⭐ LISTEN FOR REACT → UNITY PAYMENT EVENTS
+   ============================================================ */
         window.addEventListener("message", (event) => {
             const data = event.data;
 
@@ -200,6 +214,5 @@
             }
         });
     </script>
-
 </body>
 </html>
