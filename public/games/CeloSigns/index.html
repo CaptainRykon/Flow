@@ -38,7 +38,7 @@
             top: 20%;
             left: 50%;
             transform: translateX(-50%);
-            width = 60%;
+            width: 60%;
             z-index: 10;
         }
 
@@ -128,20 +128,7 @@
         };
 
 
-        function RequestPayment(amountPtr, chainPtr) {
-            var amount = UTF8ToString(amountPtr);
-            var chain = UTF8ToString(chainPtr);
-
-            console.log("💳 JS RequestPayment called:", amount, chain);
-
-            // Forward to React
-            window.parent.postMessage({
-                type: "frame-action",
-                action: "request-payment",
-                amount: Number(amount),
-                chain: chain
-            }, "*");
-        }
+      
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             var meta = document.createElement('meta');
