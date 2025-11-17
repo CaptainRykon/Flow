@@ -48,7 +48,7 @@
             object-fit: contain;
         }
 
-      
+
 
         #unity-progress-bar-empty {
             background: rgba(0, 0, 0, 0.1);
@@ -106,6 +106,8 @@
         var progressBarFull = document.querySelector("#unity-progress-bar-full");
         var warningBanner = document.querySelector("#unity-warning");
 
+        let unityInstance = null;
+
         function unityShowBanner(msg, type) {
             console.log("Unity Banner:", msg, type);
         }
@@ -122,14 +124,14 @@
             productName: "Connect Game",
             productVersion: "1.0",
             showBanner: unityShowBanner,
-            backgroundColor: "#fcfe53" // ✅ White background
+            backgroundColor: "#063395"
         };
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             var meta = document.createElement('meta');
             meta.name = 'viewport';
             meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-            document.getElementsByTagName('head')[0].appendChild(meta);
+            document.head.appendChild(meta);
         }
 
         loadingBar.style.display = "block";
@@ -139,10 +141,12 @@
         script.onload = () => {
             createUnityInstance(canvas, config, (progress) => {
                 progressBarFull.style.width = (100 * progress) + "%";
-            }).then((unityInstance) => {
-                window.unityInstance = unityInstance;
+            }).then((instance) => {
+                unityInstance = instance;
                 loadingBar.style.display = "none";
-                document.querySelector(".overlay").style.display = "none"; // Hide splash once loaded
+                document.querySelector(".overlay").style.display = "none";
+
+                console.log("✅ Unity Loaded");
             }).catch((message) => {
                 console.error(message);
             });
@@ -150,8 +154,8 @@
         document.body.appendChild(script);
 
         /* ============================================================
-   ⭐ LISTEN FOR REACT → UNITY PAYMENT EVENTS
-   ============================================================ */
+           ⭐ LISTEN FOR REACT → UNITY PAYMENT EVENTS
+           ============================================================ */
         window.addEventListener("message", (event) => {
             const data = event.data;
 
@@ -196,5 +200,6 @@
             }
         });
     </script>
+
 </body>
 </html>
