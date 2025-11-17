@@ -147,6 +147,53 @@
             });
         };
         document.body.appendChild(script);
+
+        /* ============================================================
+   ⭐ LISTEN FOR REACT → UNITY PAYMENT EVENTS
+   ============================================================ */
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+
+
+
+            if (!data || typeof data !== "object") return;
+
+
+            if (data.type === "FARCASTER_USER_INFO") {
+                const { username, pfpUrl } = data.payload || {};
+
+                console.log("👤 Received username:", username);
+
+                if (username && unityInstance)
+                    unityInstance.SendMessage("FarcasterBridge", "SetFarcasterUsername", username);
+
+                if (pfpUrl && unityInstance)
+                    unityInstance.SendMessage("FarcasterBridge", "SetPfpUrl", pfpUrl);
+
+                return;
+            }
+
+
+            // Check for method call from React
+            if (data.type === "UNITY_METHOD_CALL") {
+                console.log("📩 Message received from React → Unity:", data);
+
+                if (!unityInstance) {
+                    console.warn("⚠ Unity not ready yet.");
+                    return;
+                }
+
+                const method = data.method;
+                const args = data.args?.[0] ?? "";
+
+                // Call into Unity
+                unityInstance.SendMessage(
+                    "FarcasterBridge",
+                    method,
+                    args
+                );
+            }
+        });
     </script>
 </body>
 </html>
