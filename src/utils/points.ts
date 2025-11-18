@@ -1,6 +1,6 @@
 ﻿// utils/points.ts
 import { db } from "@/lib/firebase";
-import { ref, get, update, set } from "firebase/database";
+import { ref, get, set } from "firebase/database";
 
 export async function getPoints(fid: string) {
     const userRef = ref(db, "users/" + fid + "/points");
@@ -20,4 +20,4 @@ export async function savePoints(fid: string, total: number) {
     return total;
 }
 
-}
+
