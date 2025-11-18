@@ -1,38 +1,20 @@
-﻿// src/utils/rewards.ts
-import { ref, get, set, update } from "firebase/database";
-import { db } from "../lib/firebase";
+﻿import { db } from "@/lib/firebase";
+import { ref, get, set } from "firebase/database";
 
-/**
- * Get reward data for a player
- */
-export async function getDailyRewardData(fid: string) {
-    const userRef = ref(db, `users/${fid}/dailyReward`);
-    const snapshot = await get(userRef);
+export async function getPoints(fid: string) {
+    const userRef = ref(db, "users/" + fid + "/points");
+    const snap = await get(userRef);
 
-    if (!snapshot.exists()) {
-        console.log("🆕 Creating new daily reward entry for", fid);
-        const defaultData = {
-            lastClaimTime: new Date().toISOString(),
-            claimedToday: false,
-        };
-        await set(userRef, defaultData);
-        return defaultData;
+    if (!snap.exists()) {
+        await set(userRef, { total: 0 });
+        return 0;
     }
 
-    return snapshot.val();
+    return snap.val().total ?? 0;
 }
 
-/**
- * Save the claim time to Firebase when player collects daily reward
- */
-export async function saveDailyRewardClaim(fid: string) {
-    const userRef = ref(db, `users/${fid}/dailyReward`);
-    const now = new Date().toISOString();
-
-    await update(userRef, {
-        lastClaimTime: now,
-        claimedToday: true,
-    });
-
-    console.log("💾 Saved daily reward claim:", fid, now);
+export async function savePoints(fid: string, total: number) {
+    const userRef = ref(db, "users/" + fid + "/points");
+    await set(userRef, { total });
+    return total;
 }
