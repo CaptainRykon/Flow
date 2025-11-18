@@ -69,7 +69,7 @@ import { getWalletClient } from "wagmi/actions";
 // --- utils ---
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 import { getSpinData, setSpinData } from "@/utils/spins";
-import { addPoints, getPoints } from "@/utils/points";
+import { getPoints, savePoints } from "@/utils/points";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
 //import { switchChain } from "wagmi/actions";
@@ -700,13 +700,16 @@ export default function FarcasterApp() {
                                 if (!fid) return;
 
                                 try {
-                                    await addPoints(fid, actionData.amount ?? 0);
-                                    console.log("💾 Saved points:", actionData.amount);
+                                    // Replace points completely (do NOT add!)
+                                    await savePoints(fid, actionData.amount ?? 0);
+
+                                    console.log("💾 Saved TOTAL points =", actionData.amount);
                                 } catch (err) {
                                     console.error("❌ save-points error:", err);
                                 }
                                 break;
                             }
+
 
 
 

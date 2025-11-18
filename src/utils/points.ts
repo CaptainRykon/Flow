@@ -14,16 +14,10 @@ export async function getPoints(fid: string) {
     return snap.val().total ?? 0;
 }
 
-export async function addPoints(fid: string, amount: number) {
+export async function savePoints(fid: string, total: number) {
     const userRef = ref(db, "users/" + fid + "/points");
-    const snap = await get(userRef);
+    await set(userRef, { total });
+    return total;
+}
 
-    let current = 0;
-    if (snap.exists()) current = Number(snap.val().total) || 0;
-
-    const updated = current + amount;
-
-    await update(userRef, { total: updated });
-
-    return updated;
 }
