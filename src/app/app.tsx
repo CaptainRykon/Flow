@@ -69,6 +69,7 @@ import { getWalletClient } from "wagmi/actions";
 // --- utils ---
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 import { getSpinData, setSpinData } from "@/utils/spins";
+import { addPoints, getPoints } from "@/utils/points";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
 //import { switchChain } from "wagmi/actions";
@@ -106,7 +107,9 @@ type FrameActionMessage = {
     | "save-daily-reward-claim"
     | "get-shop-pass-data"
     | "save-shop-pass-data"
-    | "request-pass-payment";
+    | "request-pass-payment"
+    | "get-points"
+    | "save-points";
     amount?: number;
     message?: string;
 
@@ -671,6 +674,39 @@ export default function FarcasterApp() {
                                 break;
                             }
 
+                            case "get-points": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                try {
+                                    const points = await getPoints(fid);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetPoints",
+                                            args: [String(points)],
+                                        },
+                                        "*"
+                                    );
+                                    console.log("📩 Sent points → Unity:", points);
+                                } catch (err) {
+                                    console.error("❌ get-points error:", err);
+                                }
+                                break;
+                            }
+
+                            case "save-points": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                try {
+                                    await addPoints(fid, actionData.amount ?? 0);
+                                    console.log("💾 Saved points:", actionData.amount);
+                                } catch (err) {
+                                    console.error("❌ save-points error:", err);
+                                }
+                                break;
+                            }
 
 
 

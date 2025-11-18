@@ -204,6 +204,21 @@
                     }, "*");
                 };
 
+                window.RequestPoints = () => {
+                    window.parent.postMessage(
+                        { type: "frame-action", action: "get-points" },
+                        "*"
+                    );
+                };
+
+                window.SavePoints = (points) => {
+                    window.parent.postMessage(
+                        { type: "frame-action", action: "save-points", amount: points },
+                        "*"
+                    );
+                };
+
+
                 // Add chain parameter ↓↓↓
                 window.RequestPassPayment = (amount, passType, chain) => {
                     console.log(`💳 [index.html] Requesting pass payment → ${amount} USDC for ${passType} on ${chain}`);
@@ -244,6 +259,12 @@
                         const arg = d.args?.[0] || "";
                         unityInstance.SendMessage("FarcasterBridge", "SetDailyRewardData", arg);
                     }
+
+
+                    if (d?.type === "UNITY_METHOD_CALL" && d.method === "SetPoints") {
+                        unityInstance.SendMessage("PointsManager", "SetPoints", d.args[0]);
+                    }
+
 
                     // 🏆 Shop Pass data from React → Unity
                     if (d?.type === "UNITY_METHOD_CALL" && d.method === "SetPassData") {
