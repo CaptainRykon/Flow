@@ -69,9 +69,10 @@ import { getWalletClient } from "wagmi/actions";
 // --- utils ---
 import { getCoins, addCoins, subtractCoins } from "@/utils/coins";
 import { getSpinData, setSpinData } from "@/utils/spins";
-import { getPoints, savePoints } from "@/utils/points";
+import {  getPoints, savePoints } from "@/utils/points";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
+import { saveGameLevel, getGameLevel } from "@/utils/gameProgress";
 //import { switchChain } from "wagmi/actions";
 
 
@@ -109,6 +110,8 @@ type FrameActionMessage = {
     | "save-shop-pass-data"
     | "request-pass-payment"
     | "get-points"
+    | "get-level"
+    | "save-level"
     | "save-points";
     amount?: number;
     message?: string;
@@ -119,6 +122,11 @@ type FrameActionMessage = {
 
     // ⭐ Add this
     chain?: "base" | "arbitrum" | "celo";
+
+
+    // ⭐ LEVEL SYSTEM
+    gameId?: string;  // ← REQUIRED
+    level?: number;   // ← REQUIRED
 
 
     // 🔹 Flexible data payload for spin, reward, and pass info
@@ -357,6 +365,44 @@ export default function FarcasterApp() {
                             }
 
 
+
+
+
+                            case "get-level": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                if (!actionData.gameId) {
+                                    console.error("❌ Missing gameId in get-level");
+                                    return;
+                                }
+
+                                const progress = await getGameLevel(fid, actionData.gameId);
+
+                                iframeRef.current?.contentWindow?.postMessage(
+                                    {
+                                        type: "UNITY_METHOD_CALL",
+                                        method: "SetGameLevel",
+                                        args: [String(progress.level ?? 1)],
+                                    },
+                                    "*"
+                                );
+                                break;
+                            }
+
+
+                            case "save-level": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                if (!actionData.gameId || actionData.level == null) {
+                                    console.error("❌ Missing gameId or level in save-level");
+                                    return;
+                                }
+
+                                await saveGameLevel(fid, actionData.gameId, actionData.level);
+                                break;
+                            }
 
 
 
