@@ -1,14 +1,15 @@
 ﻿import { db } from "@/lib/firebase";
-import { ref, get, update } from "firebase/database";
+import { ref, get, set, update } from "firebase/database";
 
 export async function getGameLevel(fid: string, gameId: string) {
     const userRef = ref(db, `users/${fid}/gameProgress/${gameId}`);
     const snap = await get(userRef);
 
     if (!snap.exists()) {
-        return { level: 1 };
+        const defaultData = { level: 1, timestamp: new Date().toISOString() };
+        await set(userRef, defaultData);   // <------- IMPORTANT
+        return defaultData;
     }
-
     return snap.val();
 }
 
