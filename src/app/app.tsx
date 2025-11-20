@@ -72,7 +72,9 @@ import { getSpinData, setSpinData } from "@/utils/spins";
 import {  getPoints, savePoints } from "@/utils/points";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
-import { saveGameLevel, getGameLevel } from "@/utils/gameProgress";
+import { getCeloSignsProgress, saveCeloSignsProgress, CeloSignsProgress } from "@/utils/CelosignsProgress";
+
+
 //import { switchChain } from "wagmi/actions";
 
 
@@ -110,9 +112,11 @@ type FrameActionMessage = {
     | "save-shop-pass-data"
     | "request-pass-payment"
     | "get-points"
-    | "get-level"
-    | "save-level"
-    | "save-points";
+    | "save-points"
+    | "get-celosigns-progress"
+    | "save-celosigns-progress";
+
+
     amount?: number;
     message?: string;
 
@@ -135,6 +139,7 @@ type FrameActionMessage = {
         lastResetTime?: string;
         passType?: string;
         expiry?: string;
+
     };
 
 
@@ -368,46 +373,55 @@ export default function FarcasterApp() {
 
 
 
-                            case "get-level": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid) return;
 
-                                if (!actionData.gameId) {
-                                    console.error("❌ Missing gameId in get-level");
+                            // React → Unity : return saved CeloSigns object (JSON string)
+                            case "get-celosigns-progress": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) {
+                                    console.warn("get-celosigns-progress: no fid");
                                     return;
                                 }
-
-                                const progress = await getGameLevel(fid, actionData.gameId);
-
-                                iframeRef.current?.contentWindow?.postMessage(
-                                    {
-                                        type: "UNITY_METHOD_CALL",
-                                        method: "SetGameLevel",
-                                        args: [String(progress.level ?? 1)],
-                                    },
-                                    "*"
-                                );
+                                try {
+                                    const data = await getCeloSignsProgress(fid);
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "SetCeloSignsProgress",
+                                            args: [JSON.stringify(data)],
+                                        },
+                                        "*"
+                                    );
+                                    console.log("✅ Sent CeloSigns progress to Unity");
+                                } catch (err) {
+                                    console.error("❌ get-celosigns-progress error:", err);
+                                }
                                 break;
                             }
 
-
-                            case "save-level": {
+                            // Unity → React : save posted CeloSigns object (actionData.data must be parsed JSON)
+                            case "save-celosigns-progress": {
                                 const fid = userInfoRef.current.fid;
-                                if (!fid) return;
-
-                                if (!actionData.gameId || actionData.level == null) {
-                                    console.error("❌ Missing gameId or level in save-level");
+                                if (!fid) {
+                                    console.warn("save-celosigns-progress: no fid");
                                     return;
                                 }
 
-                                await saveGameLevel(fid, actionData.gameId, actionData.level);
+                                const incoming = actionData.data as unknown;
+                                if (!incoming || typeof incoming !== "object") {
+                                    console.error("❌ save-celosigns-progress: invalid payload", incoming);
+                                    return;
+                                }
+
+                                // Type-assert to our shape (we trust Unity JSON but be defensive)
+                                const payload = incoming as CeloSignsProgress;
+                                try {
+                                    await saveCeloSignsProgress(fid, payload);
+                                    console.log("💾 Saved CeloSigns progress to Firebase");
+                                } catch (err) {
+                                    console.error("❌ save-celosigns-progress error:", err);
+                                }
                                 break;
                             }
-
-
-
-
-
 
 
 
