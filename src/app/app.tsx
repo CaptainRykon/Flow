@@ -398,30 +398,72 @@ export default function FarcasterApp() {
                                 break;
                             }
 
-                            // Unity → React : save posted CeloSigns object (actionData.data must be parsed JSON)
-                            case "save-celosigns-progress": {
+                            /* ------------ LOAD from Firebase -> Unity ------------ */
+                            case "get-celosigns-progress": {
                                 const fid = userInfoRef.current.fid;
-                                if (!fid) {
-                                    console.warn("save-celosigns-progress: no fid");
-                                    return;
-                                }
+                                if (!fid) return;
 
-                                const incoming = actionData.data as unknown;
-                                if (!incoming || typeof incoming !== "object") {
-                                    console.error("❌ save-celosigns-progress: invalid payload", incoming);
-                                    return;
-                                }
+                                const data = await getCeloSignsProgress(fid);
 
-                                // Type-assert to our shape (we trust Unity JSON but be defensive)
-                                const payload = incoming as CeloSignsProgress;
-                                try {
-                                    await saveCeloSignsProgress(fid, payload);
-                                    console.log("💾 Saved CeloSigns progress to Firebase");
-                                } catch (err) {
-                                    console.error("❌ save-celosigns-progress error:", err);
-                                }
+                                iframeRef.current?.contentWindow?.postMessage(
+                                    {
+                                        type: "UNITY_METHOD_CALL",
+                                        method: "SetCeloSignsProgress",
+                                        args: [JSON.stringify(data)],
+                                    },
+                                    "*"
+                                );
+
+                                console.log("✅ Sent CeloSigns progress to Unity:", data);
                                 break;
                             }
+
+
+
+
+                            /* ------------ SAVE Unity -> Firebase ------------ */
+                            case "save-celosigns-progress": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                // SAFEST type: unknown → forces validation before use
+                                const raw: unknown = actionData.data;
+
+                                // Runtime validation
+                                if (typeof raw !== "object" || raw === null) {
+                                    console.error("❌ save-celosigns-progress: payload not an object:", raw);
+                                    return;
+                                }
+
+                                // Now safe to treat as `any`
+                                const obj = raw as Record<string, unknown>;
+
+                                const payload: CeloSignsProgress = {
+                                    currentLevel: typeof obj.currentLevel === "number" ? obj.currentLevel : 1,
+                                    numberOfHints: typeof obj.numberOfHints === "number" ? obj.numberOfHints : 10,
+
+                                    totalLevelCrossed:
+                                        obj.totalLevelCrossed && typeof obj.totalLevelCrossed === "object"
+                                            ? (obj.totalLevelCrossed as Record<string, string>)
+                                            : {},
+
+                                    levelUnlocked:
+                                        obj.levelUnlocked && typeof obj.levelUnlocked === "object"
+                                            ? (obj.levelUnlocked as Record<string, number>)
+                                            : {},
+
+                                    lastUpdated: new Date().toISOString(),
+                                };
+
+                                console.log("💾 Saving validated CeloSignsProgress:", payload);
+
+                                await saveCeloSignsProgress(fid, payload);
+
+                                console.log("✅ Saved to Firebase.");
+                                break;
+                            }
+
+
 
 
 
