@@ -72,7 +72,8 @@ import { getSpinData, setSpinData } from "@/utils/spins";
 import {  getPoints, savePoints } from "@/utils/points";
 import { saveDailyRewardClaim, getDailyRewardData } from "@/utils/rewards";
 import { getPassData, savePassData } from "@/utils/passes";
-import { getCeloSignsProgress, saveCeloSignsProgress, CeloSignsProgress } from "@/utils/CelosignsProgress";
+import { getPlayerData, setPlayerData } from "@/utils/playerData";
+
 
 
 //import { switchChain } from "wagmi/actions";
@@ -113,8 +114,8 @@ type FrameActionMessage = {
     | "request-pass-payment"
     | "get-points"
     | "save-points"
-    | "get-celosigns-progress"
-    | "save-celosigns-progress";
+    | "get-player-data"
+    | "save-player-data";
 
 
     amount?: number;
@@ -132,6 +133,8 @@ type FrameActionMessage = {
     gameId?: string;  // ← REQUIRED
     level?: number;   // ← REQUIRED
 
+
+    json?: string;
 
     // 🔹 Flexible data payload for spin, reward, and pass info
     data?: {
@@ -374,95 +377,48 @@ export default function FarcasterApp() {
 
 
 
-                            // React → Unity : return saved CeloSigns object (JSON string)
-                            case "get-celosigns-progress": {
+                            
+
+                            /* ------------ LOAD from Firebase -> Unity ------------ */
+                            case "save-player-data": {
                                 const fid = userInfoRef.current.fid;
-                                if (!fid) {
-                                    console.warn("get-celosigns-progress: no fid");
-                                    return;
-                                }
+                                if (!fid || !actionData.json) return;
+
                                 try {
-                                    const data = await getCeloSignsProgress(fid);
+                                    const parsed = JSON.parse(actionData.json);
+                                    // sanity: ensure keys exist
+                                    if (!parsed.TotalLevelCrossed || !parsed.LEVELUNLOCKED) {
+                                        console.warn("incoming player JSON missing keys:", parsed);
+                                        // still allow save if you want
+                                    }
+                                    await setPlayerData(fid, parsed);
+                                    console.log("✅ Player data saved:", parsed);
+                                } catch (err) {
+                                    console.error("save-player-data error:", err);
+                                }
+                                break;
+                            }
+
+                            case "get-player-data": {
+                                const fid = userInfoRef.current.fid;
+                                if (!fid) return;
+
+                                try {
+                                    const data = await getPlayerData(fid);
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
                                             type: "UNITY_METHOD_CALL",
-                                            method: "SetCeloSignsProgress",
-                                            args: [JSON.stringify(data)],
+                                            method: "OnPlayerDataLoaded",
+                                            args: [JSON.stringify(data)]
                                         },
                                         "*"
                                     );
-                                    console.log("✅ Sent CeloSigns progress to Unity");
+                                    console.log("📤 Sent Player Data to Unity:", data);
                                 } catch (err) {
-                                    console.error("❌ get-celosigns-progress error:", err);
+                                    console.error("get-player-data error:", err);
                                 }
                                 break;
                             }
-
-                            /* ------------ LOAD from Firebase -> Unity ------------ */
-                            case "get-celosigns-progress": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid) return;
-
-                                const data = await getCeloSignsProgress(fid);
-
-                                iframeRef.current?.contentWindow?.postMessage(
-                                    {
-                                        type: "UNITY_METHOD_CALL",
-                                        method: "SetCeloSignsProgress",
-                                        args: [JSON.stringify(data)],
-                                    },
-                                    "*"
-                                );
-
-                                console.log("✅ Sent CeloSigns progress to Unity:", data);
-                                break;
-                            }
-
-
-
-
-                            /* ------------ SAVE Unity -> Firebase ------------ */
-                            case "save-celosigns-progress": {
-                                const fid = userInfoRef.current.fid;
-                                if (!fid) return;
-
-                                // SAFEST type: unknown → forces validation before use
-                                const raw: unknown = actionData.data;
-
-                                // Runtime validation
-                                if (typeof raw !== "object" || raw === null) {
-                                    console.error("❌ save-celosigns-progress: payload not an object:", raw);
-                                    return;
-                                }
-
-                                // Now safe to treat as `any`
-                                const obj = raw as Record<string, unknown>;
-
-                                const payload: CeloSignsProgress = {
-                                    currentLevel: typeof obj.currentLevel === "number" ? obj.currentLevel : 1,
-                                    numberOfHints: typeof obj.numberOfHints === "number" ? obj.numberOfHints : 10,
-
-                                    totalLevelCrossed:
-                                        obj.totalLevelCrossed && typeof obj.totalLevelCrossed === "object"
-                                            ? (obj.totalLevelCrossed as Record<string, string>)
-                                            : {},
-
-                                    levelUnlocked:
-                                        obj.levelUnlocked && typeof obj.levelUnlocked === "object"
-                                            ? (obj.levelUnlocked as Record<string, number>)
-                                            : {},
-
-                                    lastUpdated: new Date().toISOString(),
-                                };
-
-                                console.log("💾 Saving validated CeloSignsProgress:", payload);
-
-                                await saveCeloSignsProgress(fid, payload);
-
-                                console.log("✅ Saved to Firebase.");
-                                break;
-                            }
-
 
 
 
