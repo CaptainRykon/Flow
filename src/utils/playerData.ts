@@ -1,4 +1,4 @@
-﻿import { ref, get, update } from "firebase/database";
+﻿import { ref, get,set } from "firebase/database";
 import { db } from "../lib/firebase";
 
 
@@ -12,7 +12,7 @@ export interface PlayerData {
 
 export async function setPlayerData(fid: string, data: PlayerData) {
     const userRef = ref(db, "playerdata/" + fid);
-    await update(userRef, data);
+    await set(userRef, data);   // ✔ Overwrites or creates if missing
 }
 
 export async function getPlayerData(fid: string) {
