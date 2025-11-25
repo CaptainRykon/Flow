@@ -815,8 +815,9 @@ export default function FarcasterApp() {
                                         "*"
                                     );
 
-                                    break;
+                                   
                                 }
+                                break;
                             }
 
                             case "get-points": {
