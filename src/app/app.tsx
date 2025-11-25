@@ -194,13 +194,18 @@ export default function FarcasterApp() {
         };
     }, []);
 
+
+
     useEffect(() => {
         let mounted = true;
+       
 
         const init = async () => {
             try {
                 await sdk.actions.ready();
                 await sdk.actions.addFrame();
+
+
 
                 const context = await sdk.context;
                 const user = context?.user || {};
@@ -248,9 +253,7 @@ export default function FarcasterApp() {
                     }
                 });
 
-
-
-
+                // add inside FarcasterApp (near the other helpers using iframeRef)
 
 
 
@@ -724,12 +727,49 @@ export default function FarcasterApp() {
                                     }
                                 } catch (err) {
                                     console.error("❌ request-pass-payment failed:", err);
+                                    // Type-safe error object
+                                    const e = err as { code?: number; message?: string };
+                                    const code = e.code;
+                                    const message = String(e.message || "").toLowerCase();
+
+                                    // -------------------------------
+                                    // 🎯 Detect user pressing CANCEL
+                                    // -------------------------------
+                                    if (
+                                        code === 4001 ||               // EIP1193 user rejected
+                                        code === -32000 ||             // MetaMask cancel
+                                        message.includes("rejected") ||
+                                        message.includes("denied") ||
+                                        message.includes("cancel")
+                                    ) {
+                                        console.log("❌ User canceled payment");
+
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "OnPaymentFailed",
+                                                args: ["USER_CANCELED"]
+                                            },
+                                            "*"
+                                        );
+
+                                        break; // STOP here – do not send generic errors
+                                    }
+
+                                    // -------------------------------
+                                    // ❌ OTHER errors (real failures)
+                                    // -------------------------------
                                     iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "OnPaymentFailed", args: [String((err as Error)?.message ?? String(err))] },
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "OnPaymentFailed",
+                                            args: [message]
+                                        },
                                         "*"
                                     );
+
+                                    break;
                                 }
-                                break;
                             }
 
                             case "get-points": {
