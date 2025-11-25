@@ -177,6 +177,7 @@ export default function FarcasterApp() {
 
     // 🪙 Allow external scripts to send coins directly to Unity
     useEffect(() => {
+
         if (typeof window === "undefined") return;
         window.sendCoinsToUnity = (amount: number) => {
             try {
@@ -204,6 +205,8 @@ export default function FarcasterApp() {
             try {
                 await sdk.actions.ready();
                 await sdk.actions.addFrame();
+
+
 
 
 
@@ -356,7 +359,7 @@ export default function FarcasterApp() {
                                         }],
                                     });
 
-                                    console.log("✅ Payment Success",chain);
+                                    console.log("✅ Payment Success", chain);
 
                                     iframeRef.current?.contentWindow?.postMessage(
                                         { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["1"] },
@@ -364,18 +367,57 @@ export default function FarcasterApp() {
                                     );
 
                                 } catch (err) {
-                                    console.error("❌ Payment failed:", err);
+                                    console.error("❌ request-pass-payment failed:", err);
 
+                                    const e = err as { code?: number; message?: string };
+                                    const msg = (e.message || "").toLowerCase();
+                                    const code = e.code;
+
+                                    // =====================================================
+                                    // 🔥 Detect CANCEL in every wallet & every Farcaster case
+                                    // =====================================================
+                                    if (
+                                        code === 4001 ||                   // EIP-1193: user rejected transaction
+                                        code === -32000 ||                 // MetaMask cancel
+                                        msg.includes("user canceled") ||
+                                        msg.includes("user cancelled") ||
+                                        msg.includes("rejected") ||
+                                        msg.includes("denied") ||
+                                        msg.includes("cancel") ||
+                                        msg.includes("closed") ||
+                                        msg.includes("dismissed") ||
+                                        msg.includes("popup closed")
+                                    ) {
+                                        console.log("❌ User canceled payment");
+
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            {
+                                                type: "UNITY_METHOD_CALL",
+                                                method: "OnPaymentFailed",
+                                                args: ["USER_CANCELED"]
+                                            },
+                                            "*"
+                                        );
+
+                                        break;
+                                    }
+
+                                    // =====================================================
+                                    // ❌ REAL failures (not just cancellation)
+                                    // =====================================================
                                     iframeRef.current?.contentWindow?.postMessage(
-                                        { type: "UNITY_METHOD_CALL", method: "SetPaymentSuccess", args: ["0"] },
+                                        {
+                                            type: "UNITY_METHOD_CALL",
+                                            method: "OnPaymentFailed",
+                                            args: [msg]
+                                        },
                                         "*"
                                     );
+
+                                    break;
                                 }
 
-                                break;
                             }
-
-
 
 
 
@@ -727,20 +769,25 @@ export default function FarcasterApp() {
                                     }
                                 } catch (err) {
                                     console.error("❌ request-pass-payment failed:", err);
-                                    // Type-safe error object
-                                    const e = err as { code?: number; message?: string };
-                                    const code = e.code;
-                                    const message = String(e.message || "").toLowerCase();
 
-                                    // -------------------------------
-                                    // 🎯 Detect user pressing CANCEL
-                                    // -------------------------------
+                                    const e = err as { code?: number; message?: string };
+                                    const msg = (e.message || "").toLowerCase();
+                                    const code = e.code;
+
+                                    // =====================================================
+                                    // 🔥 Detect CANCEL in every wallet & every Farcaster case
+                                    // =====================================================
                                     if (
-                                        code === 4001 ||               // EIP1193 user rejected
-                                        code === -32000 ||             // MetaMask cancel
-                                        message.includes("rejected") ||
-                                        message.includes("denied") ||
-                                        message.includes("cancel")
+                                        code === 4001 ||                   // EIP-1193: user rejected transaction
+                                        code === -32000 ||                 // MetaMask cancel
+                                        msg.includes("user canceled") ||
+                                        msg.includes("user cancelled") ||
+                                        msg.includes("rejected") ||
+                                        msg.includes("denied") ||
+                                        msg.includes("cancel") ||
+                                        msg.includes("closed") ||
+                                        msg.includes("dismissed") ||
+                                        msg.includes("popup closed")
                                     ) {
                                         console.log("❌ User canceled payment");
 
@@ -753,17 +800,17 @@ export default function FarcasterApp() {
                                             "*"
                                         );
 
-                                        break; // STOP here – do not send generic errors
+                                        break;
                                     }
 
-                                    // -------------------------------
-                                    // ❌ OTHER errors (real failures)
-                                    // -------------------------------
+                                    // =====================================================
+                                    // ❌ REAL failures (not just cancellation)
+                                    // =====================================================
                                     iframeRef.current?.contentWindow?.postMessage(
                                         {
                                             type: "UNITY_METHOD_CALL",
                                             method: "OnPaymentFailed",
-                                            args: [message]
+                                            args: [msg]
                                         },
                                         "*"
                                     );
