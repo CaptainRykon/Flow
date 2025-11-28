@@ -215,17 +215,31 @@ export default function FarcasterApp() {
 
 
               
+                //const context = await sdk.context;
+               
+                // 1) Read initial state
                 const context = await sdk.context;
-                const isAdded = context?.client?.added ?? false;
+                const added = Boolean(context?.client?.added);
+                console.log("Initial Mini App added state:", added);
 
-                if (!isAdded) {
-                    console.log("❌ User has NOT added the mini app.");
-                    iframeRef.current?.contentWindow?.postMessage(
-                        { type: "UNITY_METHOD_CALL", method: "OnMiniAppNotAdded", args: [""] },
-                        "*"
-                    );
-                }
+                // 2) On iframe load, send to Unity
+                iframeRef.current?.addEventListener("load", async () => {
+                    const ctxNow = await sdk.context;
+                    const nowAdded = Boolean(ctxNow?.client?.added);
 
+                    console.log("iframe load → mini app added?", nowAdded);
+
+                    postToUnity(); // your existing user info sender
+
+                    if (!nowAdded ) {
+                        iframeRef.current?.contentWindow?.postMessage(
+                            { type: "UNITY_METHOD_CALL", method: "OnMiniAppNotAdded", args: [""] },
+                            "*"
+                        );
+                    }
+                });
+
+              
 
 
 
@@ -442,28 +456,33 @@ export default function FarcasterApp() {
 
                             case "add-miniapp": {
                                 try {
-                                    console.log("📨 Unity says: show Add Mini App popup");
+                                    console.log("User pressed Add Mini App");
 
-                                    const result = await sdk.actions.addFrame(); // Farcaster popup
-                                    console.log("📦 addFrame result:", result);
+                                    await sdk.actions.addFrame();   // Opens Warpcast popup
 
-                                    // Re-check state
-                                    const contextNow = await sdk.context;
-                                    const added = contextNow?.client?.added ?? false;
+                                    // After popup closes, re-check updated context
+                                    const updated = await sdk.context;
 
-                                    if (added) {
-                                        console.log("✅ Mini App added successfully!");
-
+                                    if (updated?.client?.added) {
+                                        console.log("Mini App successfully added!");
                                         iframeRef.current?.contentWindow?.postMessage(
                                             { type: "UNITY_METHOD_CALL", method: "OnMiniAppAdded", args: [""] },
                                             "*"
                                         );
+                                    } else {
+                                        console.log("Mini App NOT added (popup closed or user cancelled)");
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            { type: "UNITY_METHOD_CALL", method: "OnMiniAppNotAdded", args: [""] },
+                                            "*"
+                                        );
                                     }
                                 } catch (e) {
-                                    console.error("❌ add-miniapp error:", e);
+                                    console.error("add-miniapp error", e);
                                 }
                                 break;
                             }
+
+
 
 
                             case "miniapp-not-added": {
