@@ -115,7 +115,9 @@ type FrameActionMessage = {
     | "get-points"
     | "save-points"
     | "get-player-data"
-    | "save-player-data";
+    | "save-player-data"
+    | "add-miniapp"
+    | "miniapp-not-added";
 
 
     amount?: number;
@@ -175,6 +177,8 @@ export default function FarcasterApp() {
     const config = useConfig();
 
 
+
+
     // 🪙 Allow external scripts to send coins directly to Unity
     useEffect(() => {
 
@@ -210,7 +214,22 @@ export default function FarcasterApp() {
 
 
 
+              
                 const context = await sdk.context;
+                const isAdded = context?.client?.added ?? false;
+
+                if (!isAdded) {
+                    console.log("❌ User has NOT added the mini app.");
+                    iframeRef.current?.contentWindow?.postMessage(
+                        { type: "UNITY_METHOD_CALL", method: "OnMiniAppNotAdded", args: [""] },
+                        "*"
+                    );
+                }
+
+
+
+
+
                 const user = context?.user || {};
                 userInfoRef.current = {
                     username: user.username || "Guest",
@@ -418,6 +437,46 @@ export default function FarcasterApp() {
                                 }
 
                             }
+
+                            /* ------------ Mini App Added function to unity  ------------ */
+
+                            case "add-miniapp": {
+                                try {
+                                    console.log("📨 Unity says: show Add Mini App popup");
+
+                                    const result = await sdk.actions.addFrame(); // Farcaster popup
+                                    console.log("📦 addFrame result:", result);
+
+                                    // Re-check state
+                                    const contextNow = await sdk.context;
+                                    const added = contextNow?.client?.added ?? false;
+
+                                    if (added) {
+                                        console.log("✅ Mini App added successfully!");
+
+                                        iframeRef.current?.contentWindow?.postMessage(
+                                            { type: "UNITY_METHOD_CALL", method: "OnMiniAppAdded", args: [""] },
+                                            "*"
+                                        );
+                                    }
+                                } catch (e) {
+                                    console.error("❌ add-miniapp error:", e);
+                                }
+                                break;
+                            }
+
+
+                            case "miniapp-not-added": {
+                                iframeRef.current?.contentWindow?.postMessage(
+                                    { type: "UNITY_METHOD_CALL", method: "OnMiniAppNotAdded", args: [""] },
+                                    "*"
+                                );
+                                break;
+                            }
+
+
+
+
 
 
 
