@@ -208,7 +208,7 @@ export default function FarcasterApp() {
         const init = async () => {
             try {
                 await sdk.actions.ready();
-                await sdk.actions.addFrame();
+               // await sdk.actions.addFrame();
 
 
 
@@ -224,20 +224,24 @@ export default function FarcasterApp() {
 
                 // 2) On iframe load, send to Unity
                 iframeRef.current?.addEventListener("load", async () => {
-                    const ctxNow = await sdk.context;
-                    const nowAdded = Boolean(ctxNow?.client?.added);
+                    const ctx = await sdk.context;
+                    const added = Boolean(ctx?.client?.added);
 
-                    console.log("iframe load → mini app added?", nowAdded);
+                    console.log("iframe loaded → miniAppAdded =", added);
 
-                    postToUnity(); // your existing user info sender
-
-                    if (!nowAdded ) {
+                    if (!added) {
+                        // tell Unity FIRST before anything else
                         iframeRef.current?.contentWindow?.postMessage(
                             { type: "UNITY_METHOD_CALL", method: "OnMiniAppNotAdded", args: [""] },
                             "*"
                         );
+                        return; // stop here — DO NOT call postToUnity yet
                     }
+
+                    // user added mini app → proceed normally
+                    postToUnity();
                 });
+
 
               
 
